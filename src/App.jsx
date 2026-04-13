@@ -59,6 +59,7 @@ export default function App() {
   const [adPg, setAdPg] = useState("hub"); const [adAuth, setAdAuth] = useState(false);
   const [aaName, setAAN] = useState(""); const [aaPin, setAAP] = useState(""); const [aaErr, setAAE] = useState("");
   const [editUser, setEU] = useState(null); const [euN, setEUN] = useState(""); const [euE, setEUE] = useState(""); const [euP, setEUP] = useState("");
+  const [delUserMod, setDUM] = useState(null);
   const [nCat, setNC] = useState(""); const [adminEmail, setAdminEmail] = useState("");
   // Report
   const [rptCat, setRptCat] = useState("All"); const [rptCond, setRptCond] = useState("All"); const [rptStock, setRptStock] = useState("All");
@@ -159,6 +160,7 @@ export default function App() {
   const togUser = async (id, a) => { try { await api(`yard_users?id=eq.${id}`, { method: "PATCH", body: JSON.stringify({ active: !a }) }); await load(); show(a ? "Deactivated" : "Activated"); } catch (e) { show("Error"); } };
   const chRole = async (id, r) => { try { await api(`yard_users?id=eq.${id}`, { method: "PATCH", body: JSON.stringify({ role: r }) }); await load(); show("Updated"); } catch (e) { show("Error"); } };
   const saveEU = async () => { if (!euN.trim() || !euE.trim() || euP.length !== 4) { show("Fill all fields"); return; } try { await api(`yard_users?id=eq.${editUser}`, { method: "PATCH", body: JSON.stringify({ name: euN.trim(), email: euE.toLowerCase().trim(), pin: euP }) }); await load(); setEU(null); show("Updated"); } catch (e) { show("Error"); } };
+  const delUser = async (id) => { try { await api(`yard_users?id=eq.${id}`, { method: "DELETE" }); await load(); setDUM(null); show("Employee deleted"); } catch (e) { show("Error"); } };
 
   // Derived
   const lowS = mats.filter(m => gSt(m.qty, m.low_threshold) !== "good");
@@ -350,6 +352,7 @@ export default function App() {
                   <button onClick={() => { setEU(u.id); setEUN(u.name); setEUE(u.email); setEUP(u.pin); }} style={{ fontSize: 11, padding: "4px 10px", borderRadius: 6, border: `1px solid ${P.bd}`, background: "#fff", color: P.m, cursor: "pointer", fontFamily: F.m }}>Edit</button>
                   <select value={u.role} onChange={e => chRole(u.id, e.target.value)} style={{ fontSize: 11, padding: "4px 8px", borderRadius: 6, border: `1px solid ${P.bd}`, fontFamily: F.m }}><option value="user">Employee</option><option value="admin">Admin</option>{isS && <option value="senior_admin">Sr Admin</option>}</select>
                   <button onClick={() => togUser(u.id, u.active)} style={{ fontSize: 11, padding: "4px 10px", borderRadius: 6, border: "none", background: u.active ? P.rB : P.gB, color: u.active ? P.r : P.g, fontWeight: 600, cursor: "pointer", fontFamily: F.m }}>{u.active ? "Deactivate" : "Activate"}</button>
+                  <button onClick={() => setDUM(u.id)} style={{ fontSize: 11, padding: "4px 10px", borderRadius: 6, border: "none", background: P.r, color: "#fff", fontWeight: 600, cursor: "pointer", fontFamily: F.m }}>Delete</button>
                 </div>}
               </div>
             </div>; })}
@@ -419,6 +422,11 @@ export default function App() {
     <Modal open={emailMod} onClose={() => setEM(false)} title="Email Report">
       <Fl l="Send to"><input style={iS} type="email" value={emailTo} onChange={e => setET(e.target.value)} placeholder="payroll@masterpiecelv.com" /></Fl>
       <Btn full disabled={!emailTo.trim()} onClick={emailRpt}>Send</Btn>
+    </Modal>
+
+    <Modal open={!!delUserMod} onClose={() => setDUM(null)} title="Delete Employee?">
+      <p style={{ color: P.m, marginBottom: 20 }}>This will permanently remove <strong>{users.find(u => u.id === delUserMod)?.name}</strong>. This cannot be undone.</p>
+      <div style={{ display: "flex", gap: 10 }}><button onClick={() => setDUM(null)} style={{ flex: 1, padding: 12, borderRadius: 10, border: `1.5px solid ${P.bd}`, background: "#fff", color: P.m, fontWeight: 600, cursor: "pointer" }}>Cancel</button><Btn full color={P.r} onClick={() => delUser(delUserMod)} sx={{ flex: 1 }}>Delete</Btn></div>
     </Modal>
 
     <Nav tab={tab} set={t => { setTab(t); if (t !== "admin") { setAdPg("hub"); setAdAuth(false); setAAN(""); setAAP(""); } }} isAdmin={isA} />
