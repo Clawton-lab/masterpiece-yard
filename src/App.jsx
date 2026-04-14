@@ -30,7 +30,7 @@ function CB({ c }) { const cl = CC[c] || P.am; return <span style={{ fontSize: 1
 function Toast({ msg, show }) { return <div style={{ position: "fixed", bottom: 80, left: "50%", transform: `translateX(-50%) translateY(${show ? 0 : 20}px)`, background: P.r, color: "#fff", padding: "12px 22px", borderRadius: 12, fontSize: 14, fontWeight: 600, opacity: show ? 1 : 0, transition: "all .3s", pointerEvents: "none", zIndex: 9999, maxWidth: "90%", textAlign: "center", fontFamily: F.b }}>{msg}</div>; }
 
 function Nav({ tab, set, isAdmin }) {
-  const ts = [{ k: "yard", l: "Yard" }, { k: "tools", l: "Tools" }, { k: "office", l: "Office" }, { k: "activity", l: "Activity" }, { k: "projects", l: "Projects" }];
+  const ts = [{ k: "yard", l: "Yard" }, { k: "tools", l: "Tools" }, { k: "office", l: "Office" }, { k: "projects", l: "Projects" }];
   if (isAdmin) ts.push({ k: "admin", l: "Admin" });
   return <nav style={{ position: "fixed", bottom: 0, left: 0, right: 0, zIndex: 900, background: "#fff", borderTop: `2px solid ${P.tn}`, display: "flex", justifyContent: "space-around", padding: "8px 0 env(safe-area-inset-bottom,8px)" }}>
     {ts.map(t => <button key={t.k} onClick={() => set(t.k)} style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 2, padding: "4px 6px", background: "none", border: "none", cursor: "pointer", color: tab === t.k ? P.r : P.l, borderTop: tab === t.k ? `2px solid ${P.r}` : "2px solid transparent", marginTop: -2, minWidth: 0 }}><span style={{ fontSize: 9, fontWeight: 700, fontFamily: F.m }}>{t.l}</span></button>)}
@@ -264,17 +264,6 @@ export default function App() {
             </div>
           </div>;
         })}
-      </div>}
-
-      {/* ═══ ACTIVITY ═══ */}
-      {tab === "activity" && <div style={{ animation: "fadeIn .3s" }}>
-        <h2 style={{ fontFamily: F.h, fontSize: 20, fontWeight: 700, margin: "0 0 16px" }}>Activity</h2>
-        {[...txns.map(t => ({ ...t, tp: "m", ts: t.created_at })), ...cos.map(c => ({ ...c, tp: "t", ts: c.returned_at || c.checked_out_at }))].sort((a, b) => new Date(b.ts) - new Date(a.ts)).slice(0, 50).map(a =>
-          <div key={a.id + a.tp} style={{ padding: "12px 14px", background: "#fff", borderRadius: 12, border: `1px solid ${P.bd}`, marginBottom: 8 }}>
-            {a.tp === "m" ? <div style={{ fontSize: 14 }}><strong>{a.user_name}</strong> {a.mode === "take" ? "took" : "added"} <strong style={{ color: a.mode === "take" ? P.r : P.g }}>{a.qty} {a.unit}</strong> of <strong>{a.material_name}</strong>{a.project_name && <span style={{ color: P.m }}> → {a.project_name}</span>}</div>
-              : <div style={{ fontSize: 14 }}><strong>{a.checked_out_by}</strong> {a.returned_at ? "returned" : "checked out"} <strong style={{ color: P.r }}>{a.tool_name}</strong>{a.project_name && <span style={{ color: P.m }}> → {a.project_name}</span>}{a.returned_at && a.note && <span style={{ color: P.am }}> ({a.note})</span>}</div>}
-            <div style={{ fontSize: 11, color: P.l, fontFamily: F.m, marginTop: 4 }}>{fD(a.ts)}</div>
-          </div>)}
       </div>}
 
       {/* ═══ PROJECTS (read-only for employees) ═══ */}
