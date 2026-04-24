@@ -10,7 +10,7 @@ const RL = { super_admin: "Owner", senior_admin: "Sr Admin", admin: "Admin", use
 const UNITS = ["pcs", "SF", "LF", "bags", "boxes", "pallets", "rolls", "each"];
 const CONDS = ["Good", "Fair", "Poor"];
 const P = { bg: "#faf8f5", c: "#fff", bd: "#e5e0d8", bdL: "#f0ece6", tx: "#1a1a1a", m: "#6b6560", l: "#9c9590", r: "#c41e2a", rB: "rgba(196,30,42,0.06)", tn: "#c4b59a", tB: "rgba(196,181,154,0.12)", bk: "#1a1a1a", g: "#16a34a", gB: "rgba(22,163,74,0.08)", am: "#d97706", aB: "rgba(217,119,6,0.08)" };
-const F = { h: "'Bitter',serif", b: "'Source Sans 3',sans-serif", m: "'IBM Plex Mono',monospace" };
+const UNITS = ["pcs", "SF", "LF", "bags", "boxes", "pallets", "rolls", "each", "FT"];
 const iS = { width: "100%", padding: "12px 14px", background: "#fff", border: `1.5px solid ${P.bd}`, borderRadius: 10, color: P.tx, fontSize: 15, fontFamily: F.b, outline: "none", boxSizing: "border-box" };
 
 function gSt(q, t) { return q <= 0 ? "out" : q <= t ? "low" : "good"; }
