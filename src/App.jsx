@@ -97,7 +97,7 @@ export default function App() {
     } catch (e) { show("Error"); }
   };
 
-  const doTxn = async (matId, qty, projId, note, md) => {
+ const doTxn = async (matId, qty, projId, note, md) => {
     const mat = mats.find(x => x.id === matId), proj = projs.find(x => x.id === projId);
     const nq = md === "take" ? mat.qty - qty : mat.qty + qty;
     try {
@@ -121,7 +121,7 @@ export default function App() {
       show("Error: " + e.message); 
     }
   };
-
+  
   const delMat = async (id) => {
     const n = mats.find(m => m.id === id)?.name;
     try { 
