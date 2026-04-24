@@ -36,16 +36,10 @@ function Nav({ tab, set, isAdmin }) {
   </nav>;
 }
 
-function notifyAdmin(emails, subject, body) {
-  if (!emails) return;
-  const html = `<!DOCTYPE html><html><head><style>body{font-family:system-ui,-apple-system,sans-serif;line-height:1.6;color:#1a1a1a;max-width:600px;margin:0 auto;background:#faf8f5;padding:20px}@media print{body{background:#fff}}.header{background:#fff;border-top:4px solid #c41e2a;border-radius:12px;padding:24px;margin-bottom:16px;border:1px solid #e5e0d8;display:flex;align-items:center;gap:12px}@media print{.header{border-top:2px solid #000}}.icon{width:48px;height:48px;background:rgba(196,30,42,0.1);border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:24px}@media print{.icon{background:#fff;border:2px solid #000}}.header h1{margin:0;font-size:18px;color:#c41e2a;font-weight:700}@media print{.header h1{color:#000}}.header .time{font-size:12px;color:#6b6560;margin-top:2px}@media print{.header .time{color:#000}}.content{background:#faf8f5;border-radius:8px;padding:16px;border-left:3px solid #c41e2a;white-space:pre-wrap}@media print{.content{background:#fff;border:1px solid #000}}.content p{margin:0;font-size:15px;color:#1a1a1a}.footer{text-align:center;font-size:12px;color:#9c9590;margin-top:16px}@media print{.footer{color:#000}}</style></head><body><div class="header"><div class="icon">⚠️</div><div><h1>${subject}</h1><div class="time">${new Date().toLocaleString()}</div></div></div><div class="content"><p>${body.replace(/\n/g, '<br>')}</p></div><div class="footer">Masterpiece Material Yard & Tool Checkout</div></body></html>`;
-  window.open(`mailto:${emails}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`, "_blank");
-}
-
 export default function App() {
   const [user, setUser] = useState(null); const [mode, setMode] = useState("login");
   const [aName, setAN] = useState(""); const [aPin, setAP] = useState(""); const [aEmail, setAE] = useState(""); const [aErr, setAErr] = useState("");
-  const [mats, setMats] = useState([]); const [projs, setProjs] = useState([]); const [txns, setTxns] = useState([]); const [tools, setTools] = useState([]); const [cos, setCos] = useState([]); const [cats, setCats] = useState([]); const [users, setUsers] = useState([]);
+  const [mats, setMats] = useState([]); const [projs, setProjs] = useState([]); const [txns, setTxns] = useState([]); const [tools, setTools] = useState([]); const [cos, setCos] = useState([]); const [cats, setCats] = useState([]); const [users, setUsers] = useState([]); const [urgRpts, setUrgRpts] = useState([]);
   const [tab, setTab] = useState("yard"); const [search, setSrch] = useState(""); const [fCat, setFC] = useState("All");
   const [toast, setToast] = useState({ m: "", s: false }); const [loaded, setLoaded] = useState(false);
   const [txnMod, setTxnMod] = useState({ o: false, m: "take", mat: null });
@@ -54,7 +48,7 @@ export default function App() {
   const [delMod, setDelMod] = useState({ o: false, type: null, id: null, name: "" });
   const [editReason, setEditReason] = useState("");
   const [projMod, setProjMod] = useState(false); const [nPN, setNPN] = useState(""); const [nPA, setNPA] = useState("");
-  const [detail, setDetail] = useState(null); const [dProj, setDProj] = useState(null); const [pFilter, setPF] = useState("active");
+  const [detail, setDetail] = useState(null); const [pFilter, setPF] = useState("active");
   const [adPg, setAdPg] = useState("hub"); const [adAuth, setAdAuth] = useState(false);
   const [aaName, setAAN] = useState(""); const [aaPin, setAAP] = useState(""); const [aaErr, setAAE] = useState("");
   const [editUser, setEU] = useState(null); const [euN, setEUN] = useState(""); const [euE, setEUE] = useState(""); const [euP, setEUP] = useState("");
@@ -63,6 +57,7 @@ export default function App() {
   const [rptCat, setRptCat] = useState("All"); const [rptCond, setRptCond] = useState("All"); const [rptStock, setRptStock] = useState("All");
   const [emailMod, setEM] = useState(false); const [emailTo, setET] = useState("");
   const [retCond, setRetCond] = useState("Good"); const [retNote, setRetNote] = useState("");
+  const [urgType, setUrgType] = useState("All"); const [urgStart, setUrgStart] = useState(""); const [urgEnd, setUrgEnd] = useState("");
 
   const show = useCallback(m => { setToast({ m, s: true }); setTimeout(() => setToast(t => ({ ...t, s: false })), 2800); }, []);
   const isA = user && RO[user.role] >= 2;
@@ -70,8 +65,8 @@ export default function App() {
 
   const load = useCallback(async () => {
     try {
-      const [a, b, c, d, e, f, g] = await Promise.all([api("materials?order=name"), api("projects?order=name"), api("transactions?order=created_at.desc&limit=200"), api("tools?order=name"), api("tool_checkouts?order=checked_out_at.desc&limit=200"), api("categories?order=sort_order"), api("yard_users?order=name")]);
-      setMats(a); setProjs(b); setTxns(c); setTools(d); setCos(e); setCats(f); setUsers(g);
+      const [a, b, c, d, e, f, g, h] = await Promise.all([api("materials?order=name"), api("projects?order=name"), api("transactions?order=created_at.desc&limit=200"), api("tools?order=name"), api("tool_checkouts?order=checked_out_at.desc&limit=200"), api("categories?order=sort_order"), api("yard_users?order=name"), api("urgent_reports?order=created_at.desc&limit=200")]);
+      setMats(a); setProjs(b); setTxns(c); setTools(d); setCos(e); setCats(f); setUsers(g); setUrgRpts(h);
     } catch (e) { console.error(e); }
     setLoaded(true);
   }, []);
@@ -86,8 +81,7 @@ export default function App() {
       if (mat.id) {
         await api(`materials?id=eq.${mat.id}`, { method: "PATCH", body: JSON.stringify(mat) });
         if (reason) {
-          const rptEmails = users.filter(u => u.receives_reports).map(u => u.email).join(",");
-          if (rptEmails) notifyAdmin(rptEmails, `Material Edited: ${mat.name}`, `${user.name} edited ${mat.name}\nReason: ${reason}`);
+          await api("urgent_reports", { method: "POST", body: JSON.stringify({ type: "edit", title: `Material Edited: ${mat.name}`, message: `${user.name} edited ${mat.name}\nReason: ${reason}`, user_name: user.name, user_id: user.id }) });
         }
         show(`${mat.name} updated`);
       } else {
@@ -98,7 +92,7 @@ export default function App() {
     } catch (e) { show("Error"); }
   };
 
- const doTxn = async (matId, qty, projId, note, md) => {
+  const doTxn = async (matId, qty, projId, note, md) => {
     const mat = mats.find(x => x.id === matId), proj = projs.find(x => x.id === projId);
     const nq = md === "take" ? mat.qty - qty : mat.qty + qty;
     try {
@@ -106,11 +100,7 @@ export default function App() {
       
       if (md === "take" && nq <= 0) {
         await api(`materials?id=eq.${matId}`, { method: "DELETE" });
-        const rptUsers = users.filter(u => u.receives_reports === true);
-        if (rptUsers.length > 0) {
-          const rptEmails = rptUsers.map(u => u.email).join(",");
-          notifyAdmin(rptEmails, `Material Depleted: ${mat.name}`, `${user.name} took the last ${qty} ${mat.unit} of ${mat.name}. Item removed from inventory.`);
-        }
+        await api("urgent_reports", { method: "POST", body: JSON.stringify({ type: "depleted", title: `Material Depleted: ${mat.name}`, message: `${user.name} took the last ${qty} ${mat.unit} of ${mat.name}. Item removed from inventory.`, user_name: user.name, user_id: user.id }) });
       } else {
         await api(`materials?id=eq.${matId}`, { method: "PATCH", body: JSON.stringify({ qty: Math.max(0, nq) }) });
       }
@@ -122,16 +112,15 @@ export default function App() {
       show("Error: " + e.message); 
     }
   };
-  
+
   const delMat = async (id) => {
     const n = mats.find(m => m.id === id)?.name;
     try { 
       await api(`materials?id=eq.${id}`, { method: "DELETE" }); 
+      await api("urgent_reports", { method: "POST", body: JSON.stringify({ type: "delete", title: `Material Deleted: ${n}`, message: `${user.name} deleted material: ${n}`, user_name: user.name, user_id: user.id }) });
       await load(); 
       setDelMod({ o: false, type: null, id: null, name: "" }); 
       setDetail(null); 
-      const rptEmails = users.filter(u => u.receives_reports).map(u => u.email).join(",");
-      if (rptEmails) notifyAdmin(rptEmails, `Material Deleted: ${n}`, `${user.name} deleted material: ${n}`); 
       show(`${n} removed`); 
     } catch (e) { show("Error"); }
   };
@@ -141,8 +130,7 @@ export default function App() {
       if (tool.id) {
         await api(`tools?id=eq.${tool.id}`, { method: "PATCH", body: JSON.stringify(tool) });
         if (reason) {
-          const rptEmails = users.filter(u => u.receives_reports).map(u => u.email).join(",");
-          if (rptEmails) notifyAdmin(rptEmails, `Tool Edited: ${tool.name}`, `${user.name} edited ${tool.name}\nReason: ${reason}`);
+          await api("urgent_reports", { method: "POST", body: JSON.stringify({ type: "edit", title: `Tool Edited: ${tool.name}`, message: `${user.name} edited ${tool.name}\nReason: ${reason}`, user_name: user.name, user_id: user.id }) });
         }
         show(`${tool.name} updated`);
       } else {
@@ -163,8 +151,7 @@ export default function App() {
       await api(`tool_checkouts?id=eq.${coId}`, { method: "PATCH", body: JSON.stringify({ returned_at: new Date().toISOString(), note: note ? `Returned: ${cond}. ${note}` : `Returned: ${cond}` }) });
       await api(`tools?id=eq.${toolId}`, { method: "PATCH", body: JSON.stringify({ condition: cond, notes: note || undefined }) });
       if (cond !== "Good") {
-        const rptEmails = users.filter(u => u.receives_reports).map(u => u.email).join(",");
-        if (rptEmails) notifyAdmin(rptEmails, `Tool Returned Damaged: ${toolName}`, `${user.name} returned ${toolName}\nCondition: ${cond}\nNote: ${note || "none"}`);
+        await api("urgent_reports", { method: "POST", body: JSON.stringify({ type: "damage", title: `Tool Returned Damaged: ${toolName}`, message: `${user.name} returned ${toolName}\nCondition: ${cond}\nNote: ${note || "none"}`, user_name: user.name, user_id: user.id }) });
       }
       await load(); setRetMod({ o: false, co: null }); setRetCond("Good"); setRetNote(""); show(`${toolName} returned — ${cond}`);
     } catch (e) { show("Error"); }
@@ -174,10 +161,9 @@ export default function App() {
     const n = tools.find(t => t.id === id)?.name;
     try { 
       await api(`tools?id=eq.${id}`, { method: "DELETE" }); 
+      await api("urgent_reports", { method: "POST", body: JSON.stringify({ type: "delete", title: `Tool Deleted: ${n}`, message: `${user.name} deleted tool: ${n}`, user_name: user.name, user_id: user.id }) });
       await load(); 
       setDelMod({ o: false, type: null, id: null, name: "" }); 
-      const rptEmails = users.filter(u => u.receives_reports).map(u => u.email).join(",");
-      if (rptEmails) notifyAdmin(rptEmails, `Tool Deleted: ${n}`, `${user.name} deleted tool: ${n}`); 
       show(`${n} removed`); 
     } catch (e) { show("Error"); }
   };
@@ -188,25 +174,40 @@ export default function App() {
   const delCat = async (id, n) => { try { await api(`categories?id=eq.${id}`, { method: "DELETE" }); await load(); show(`"${n}" removed`); } catch (e) { show("Error"); } };
   const togUser = async (id, a) => { try { await api(`yard_users?id=eq.${id}`, { method: "PATCH", body: JSON.stringify({ active: !a }) }); await load(); show(a ? "Deactivated" : "Activated"); } catch (e) { show("Error"); } };
   const chRole = async (id, r) => { try { await api(`yard_users?id=eq.${id}`, { method: "PATCH", body: JSON.stringify({ role: r }) }); await load(); show("Updated"); } catch (e) { show("Error"); } };
-  const togRpts = async (id, r) => { try { await api(`yard_users?id=eq.${id}`, { method: "PATCH", body: JSON.stringify({ receives_reports: !r }) }); await load(); show("Updated"); } catch (e) { show("Error"); } };
+  const togRpts = async (id, r) => { try { await api(`yard_users?id=eq.${id}`, { method: "PATCH", body: JSON.stringify({ receives_reports: !r }) }); await load(); show("Updated"); } catch (e) { console.error(e); show("Error: " + e.message); } };
   const saveEU = async () => { if (!euN.trim() || !euE.trim() || euP.length !== 4) { show("Fill all fields"); return; } try { await api(`yard_users?id=eq.${editUser}`, { method: "PATCH", body: JSON.stringify({ name: euN.trim(), email: euE.toLowerCase().trim(), pin: euP }) }); await load(); setEU(null); show("Updated"); } catch (e) { show("Error"); } };
   const delUser = async (id) => { try { await api(`yard_users?id=eq.${id}`, { method: "DELETE" }); await load(); setDUM(null); show("Employee deleted"); } catch (e) { show("Error"); } };
 
   const lowS = mats.filter(m => gSt(m.qty, m.low_threshold) !== "good");
   const actCo = cos.filter(c => !c.returned_at);
-  const alertN = lowS.length + actCo.filter(c => (Date.now() - new Date(c.checked_out_at)) / 86400000 > 7).length;
   const filtered = mats.filter(m => { const q = search.toLowerCase(); return (!q || m.name.toLowerCase().includes(q) || m.location.toLowerCase().includes(q) || (m.notes || "").toLowerCase().includes(q)) && (fCat === "All" || m.category === fCat); });
 
   const rptMats = mats.filter(m => { if (rptCat !== "All" && m.category !== rptCat) return false; if (rptCond !== "All" && (m.condition || "Good") !== rptCond) return false; if (rptStock === "low") return gSt(m.qty, m.low_threshold) !== "good"; if (rptStock === "out") return m.qty <= 0; return true; });
   const mkCSV = () => { const r = [["Name", "Category", "Qty", "Unit", "Condition", "Location", "Notes", "Low Threshold"]]; rptMats.forEach(m => r.push([m.name, m.category, m.qty, m.unit, m.condition || "Good", m.location, m.notes, m.low_threshold])); return r.map(x => x.join(",")).join("\n"); };
   const dlCSV = () => { const b = new Blob([mkCSV()], { type: "text/csv" }); const u = URL.createObjectURL(b); const a = document.createElement("a"); a.href = u; a.download = `inventory-${new Date().toISOString().slice(0, 10)}.csv`; a.click(); URL.revokeObjectURL(u); show("Downloaded"); };
- const emailRpt = () => { 
-  if (!emailTo.trim()) return; 
-  const html = `<!DOCTYPE html><html><head><style>body{font-family:system-ui,-apple-system,sans-serif;line-height:1.6;color:#1a1a1a;max-width:800px;margin:0 auto;background:#faf8f5;padding:20px}@media print{body{background:#fff;padding:0}}.header{background:#fff;border-top:4px solid #c4b59a;border-radius:12px;padding:24px;margin-bottom:16px;border:1px solid #e5e0d8;text-align:center}@media print{.header{border-top:2px solid #000;border-radius:0}}.header h1{margin:0;font-family:Georgia,serif;font-size:24px;color:#1a1a1a}.header .subtitle{font-size:11px;color:#c41e2a;text-transform:uppercase;letter-spacing:1.5px;font-weight:700;margin-top:4px}@media print{.header .subtitle{color:#000}}.stats{background:#fff;border-radius:12px;padding:20px;border:1px solid #e5e0d8;border-left:4px solid #c41e2a;margin-bottom:16px}@media print{.stats{border:1px solid #000;border-radius:0}}.stats h2{margin:0 0 8px 0;font-size:12px;color:#6b6560;text-transform:uppercase;letter-spacing:1px}@media print{.stats h2{color:#000}}.stats .num{font-size:32px;font-weight:700;font-family:Georgia,serif}table{width:100%;background:#fff;border-radius:12px;border:1px solid #e5e0d8;border-collapse:separate;border-spacing:0;overflow:hidden}@media print{table{border:1px solid #000;border-radius:0;border-collapse:collapse}}th{background:#faf8f5;padding:12px;text-align:left;font-size:11px;color:#6b6560;text-transform:uppercase;letter-spacing:1px;font-weight:700;border-bottom:2px solid #e5e0d8}@media print{th{background:#fff;color:#000;border:1px solid #000}}td{padding:12px;border-bottom:1px solid #f0ece6}@media print{td{border:1px solid #000}}.cond-good{color:#16a34a;background:rgba(22,163,74,0.08);padding:2px 8px;border-radius:4px;font-size:11px;font-weight:700}@media print{.cond-good{color:#000;background:#fff;border:1px solid #000}}.cond-fair{color:#d97706;background:rgba(217,119,6,0.08);padding:2px 8px;border-radius:4px;font-size:11px;font-weight:700}@media print{.cond-fair{color:#000;background:#fff;border:1px solid #000}}.cond-poor{color:#c41e2a;background:rgba(196,30,42,0.06);padding:2px 8px;border-radius:4px;font-size:11px;font-weight:700}@media print{.cond-poor{color:#000;background:#fff;border:1px solid #000}}.footer{text-align:center;margin-top:24px;font-size:12px;color:#9c9590}@media print{.footer{color:#000}}</style></head><body><div class="header"><h1>Masterpiece</h1><div class="subtitle">Inventory Report</div></div><div class="stats"><h2>Total Items</h2><div class="num">${rptMats.length}</div></div><table><thead><tr><th>Name</th><th>Category</th><th>Qty</th><th>Condition</th><th>Location</th></tr></thead><tbody>${rptMats.map(m => `<tr><td style="font-weight:600">${m.name}</td><td style="font-size:13px;color:#6b6560">${m.category}</td><td style="font-weight:700;font-family:Georgia,serif">${m.qty} ${m.unit}</td><td><span class="cond-${(m.condition || 'Good').toLowerCase()}">${m.condition || 'Good'}</span></td><td style="font-size:13px;color:#6b6560">${m.location}</td></tr>`).join('')}</tbody></table><div class="footer">Generated ${new Date().toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}</div></body></html>`;
-  window.open(`mailto:${emailTo.trim()}?subject=${encodeURIComponent("Masterpiece Inventory Report")}&body=${encodeURIComponent(html)}`, "_blank");
-  setEM(false); 
-  show("Opening email"); 
-};
+  
+  const emailRpt = () => { 
+    if (!emailTo.trim()) return; 
+    const html = `<!DOCTYPE html><html><head><style>body{font-family:system-ui,-apple-system,sans-serif;line-height:1.6;color:#1a1a1a;max-width:800px;margin:0 auto;background:#faf8f5;padding:20px}@media print{body{background:#fff;padding:0}}.header{background:#fff;border-top:4px solid #c4b59a;border-radius:12px;padding:24px;margin-bottom:16px;border:1px solid #e5e0d8;text-align:center}@media print{.header{border-top:2px solid #000;border-radius:0}}.header h1{margin:0;font-family:Georgia,serif;font-size:24px;color:#1a1a1a}.header .subtitle{font-size:11px;color:#c41e2a;text-transform:uppercase;letter-spacing:1.5px;font-weight:700;margin-top:4px}@media print{.header .subtitle{color:#000}}.stats{background:#fff;border-radius:12px;padding:20px;border:1px solid #e5e0d8;border-left:4px solid #c41e2a;margin-bottom:16px}@media print{.stats{border:1px solid #000;border-radius:0}}.stats h2{margin:0 0 8px 0;font-size:12px;color:#6b6560;text-transform:uppercase;letter-spacing:1px}@media print{.stats h2{color:#000}}.stats .num{font-size:32px;font-weight:700;font-family:Georgia,serif}table{width:100%;background:#fff;border-radius:12px;border:1px solid #e5e0d8;border-collapse:separate;border-spacing:0;overflow:hidden}@media print{table{border:1px solid #000;border-radius:0;border-collapse:collapse}}th{background:#faf8f5;padding:12px;text-align:left;font-size:11px;color:#6b6560;text-transform:uppercase;letter-spacing:1px;font-weight:700;border-bottom:2px solid #e5e0d8}@media print{th{background:#fff;color:#000;border:1px solid #000}}td{padding:12px;border-bottom:1px solid #f0ece6}@media print{td{border:1px solid #000}}.cond-good{color:#16a34a;background:rgba(22,163,74,0.08);padding:2px 8px;border-radius:4px;font-size:11px;font-weight:700}@media print{.cond-good{color:#000;background:#fff;border:1px solid #000}}.cond-fair{color:#d97706;background:rgba(217,119,6,0.08);padding:2px 8px;border-radius:4px;font-size:11px;font-weight:700}@media print{.cond-fair{color:#000;background:#fff;border:1px solid #000}}.cond-poor{color:#c41e2a;background:rgba(196,30,42,0.06);padding:2px 8px;border-radius:4px;font-size:11px;font-weight:700}@media print{.cond-poor{color:#000;background:#fff;border:1px solid #000}}.footer{text-align:center;margin-top:24px;font-size:12px;color:#9c9590}@media print{.footer{color:#000}}</style></head><body><div class="header"><h1>Masterpiece</h1><div class="subtitle">Inventory Report</div></div><div class="stats"><h2>Total Items</h2><div class="num">${rptMats.length}</div></div><table><thead><tr><th>Name</th><th>Category</th><th>Qty</th><th>Condition</th><th>Location</th></tr></thead><tbody>${rptMats.map(m => `<tr><td style="font-weight:600">${m.name}</td><td style="font-size:13px;color:#6b6560">${m.category}</td><td style="font-weight:700;font-family:Georgia,serif">${m.qty} ${m.unit}</td><td><span class="cond-${(m.condition || 'Good').toLowerCase()}">${m.condition || 'Good'}</span></td><td style="font-size:13px;color:#6b6560">${m.location}</td></tr>`).join('')}</tbody></table><div class="footer">Generated ${new Date().toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}</div></body></html>`;
+    window.open(`mailto:${emailTo.trim()}?subject=${encodeURIComponent("Masterpiece Inventory Report")}&body=${encodeURIComponent(html)}`, "_blank");
+    setEM(false); 
+    show("Opening email"); 
+  };
+
+  const emailUrg = () => { 
+    if (!emailTo.trim()) return;
+    const filtered = urgRpts.filter(r => {
+      if (urgType !== "All" && r.type !== urgType) return false;
+      if (urgStart && new Date(r.created_at) < new Date(urgStart)) return false;
+      if (urgEnd && new Date(r.created_at) > new Date(urgEnd)) return false;
+      return true;
+    });
+    const html = `<!DOCTYPE html><html><head><style>body{font-family:system-ui,-apple-system,sans-serif;line-height:1.6;color:#1a1a1a;max-width:800px;margin:0 auto;background:#faf8f5;padding:20px}@media print{body{background:#fff;padding:0}}.header{background:#fff;border-top:4px solid #c41e2a;border-radius:12px;padding:24px;margin-bottom:16px;border:1px solid #e5e0d8;display:flex;align-items:center;gap:12px}@media print{.header{border-top:2px solid #000}}.icon{width:48px;height:48px;background:rgba(196,30,42,0.1);border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:24px}@media print{.icon{background:#fff;border:2px solid #000}}.header h1{margin:0;font-size:18px;color:#c41e2a;font-weight:700}@media print{.header h1{color:#000}}.header .subtitle{font-size:11px;color:#6b6560;text-transform:uppercase;letter-spacing:1.5px;font-weight:700;margin-top:4px}@media print{.header .subtitle{color:#000}}.stats{background:#fff;border-radius:12px;padding:20px;border:1px solid #e5e0d8;border-left:4px solid #c41e2a;margin-bottom:16px}@media print{.stats{border:1px solid #000;border-radius:0}}.stats h2{margin:0 0 8px 0;font-size:12px;color:#6b6560;text-transform:uppercase;letter-spacing:1px}@media print{.stats h2{color:#000}}.stats .num{font-size:32px;font-weight:700;font-family:Georgia,serif}table{width:100%;background:#fff;border-radius:12px;border:1px solid #e5e0d8;border-collapse:separate;border-spacing:0;overflow:hidden}@media print{table{border:1px solid #000;border-radius:0;border-collapse:collapse}}th{background:#faf8f5;padding:12px;text-align:left;font-size:11px;color:#6b6560;text-transform:uppercase;letter-spacing:1px;font-weight:700;border-bottom:2px solid #e5e0d8}@media print{th{background:#fff;color:#000;border:1px solid #000}}td{padding:12px;border-bottom:1px solid #f0ece6}@media print{td{border:1px solid #000}}.footer{text-align:center;margin-top:24px;font-size:12px;color:#9c9590}@media print{.footer{color:#000}}</style></head><body><div class="header"><div class="icon">⚠️</div><div><h1>Urgent Reports</h1><div class="subtitle">Masterpiece Material Yard</div></div></div><div class="stats"><h2>Total Events</h2><div class="num">${filtered.length}</div></div><table><thead><tr><th>Date</th><th>Type</th><th>Event</th><th>User</th></tr></thead><tbody>${filtered.map(r => `<tr><td style="font-size:13px">${new Date(r.created_at).toLocaleDateString()}</td><td style="font-size:13px;text-transform:capitalize">${r.type}</td><td style="font-weight:600">${r.title}<br><span style="font-size:13px;color:#6b6560;font-weight:400">${r.message.replace(/\n/g, '<br>')}</span></td><td style="font-size:13px">${r.user_name}</td></tr>`).join('')}</tbody></table><div class="footer">Generated ${new Date().toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}</div></body></html>`;
+    const rptEmails = users.filter(u => u.receives_reports).map(u => u.email).join(",");
+    window.open(`mailto:${rptEmails || emailTo.trim()}?subject=${encodeURIComponent("Masterpiece Urgent Reports")}&body=${encodeURIComponent(html)}`, "_blank");
+    setEM(false); 
+    show("Opening email"); 
+  };
 
   const css = `@import url('https://fonts.googleapis.com/css2?family=Bitter:wght@400;600;700&family=Source+Sans+3:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600;700&display=swap');@keyframes slideUp{from{transform:translateY(100%)}to{transform:translateY(0)}}@keyframes fadeIn{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:translateY(0)}}*{box-sizing:border-box}input:focus,select:focus{border-color:${P.r}!important}`;
 
@@ -249,7 +250,7 @@ export default function App() {
         {mA.length === 0 ? <div style={{ padding: 24, textAlign: "center", color: P.l, fontFamily: F.m }}>No activity</div> : mA.map(a => <div key={a.id} style={{ padding: "8px 0", borderBottom: `1px solid ${P.bdL}`, fontSize: 14 }}><strong>{a.user_name}</strong> {a.mode === "take" ? "took" : "added"} <strong style={{ color: a.mode === "take" ? P.r : P.g }}>{a.qty} {a.unit}</strong>{a.project_name && <span style={{ color: P.m }}> → {a.project_name}</span>}<div style={{ fontSize: 11, color: P.l, fontFamily: F.m }}>{fD(a.created_at)}</div></div>)}
       </div>
       {txnMod.o && txnMod.mat?.id === mat.id && <TxnSheet mat={mat} mode={txnMod.m} projs={projs} onClose={() => setTxnMod({ o: false, m: "take", mat: null })} onSubmit={doTxn} />}
-      <Modal open={delMod.o && delMod.type === "mat"} onClose={() => setDelMod({ o: false, type: null, id: null, name: "" })} title="Delete Material?"><p style={{ color: P.m, marginBottom: 20 }}>Remove <strong>{delMod.name}</strong>? Admin will be notified.</p><div style={{ display: "flex", gap: 10 }}><button onClick={() => setDelMod({ o: false, type: null, id: null, name: "" })} style={{ flex: 1, padding: 12, borderRadius: 10, border: `1.5px solid ${P.bd}`, background: "#fff", color: P.m, fontWeight: 600, cursor: "pointer" }}>Cancel</button><Btn full color={P.r} onClick={() => delMat(delMod.id)} sx={{ flex: 1 }}>Delete</Btn></div></Modal>
+      <Modal open={delMod.o && delMod.type === "mat"} onClose={() => setDelMod({ o: false, type: null, id: null, name: "" })} title="Delete Material?"><p style={{ color: P.m, marginBottom: 20 }}>Remove <strong>{delMod.name}</strong>?</p><div style={{ display: "flex", gap: 10 }}><button onClick={() => setDelMod({ o: false, type: null, id: null, name: "" })} style={{ flex: 1, padding: 12, borderRadius: 10, border: `1.5px solid ${P.bd}`, background: "#fff", color: P.m, fontWeight: 600, cursor: "pointer" }}>Cancel</button><Btn full color={P.r} onClick={() => delMat(delMod.id)} sx={{ flex: 1 }}>Delete</Btn></div></Modal>
       <Nav tab={tab} set={t => { setDetail(null); setTab(t); }} isAdmin={isA} />
     </div>;
   }
@@ -344,7 +345,7 @@ export default function App() {
 
         {adAuth && adPg === "hub" && <div>
           <h2 style={{ fontFamily: F.h, fontSize: 20, fontWeight: 700, margin: "0 0 20px" }}>Admin</h2>
-          {[{ k: "reports", l: "Inventory Report", d: "View & export inventory", c: P.r }, { k: "employees", l: "Employees", d: "Manage team", c: P.bk }, { k: "categories", l: "Categories", d: "Add & remove categories", c: P.tn }].map(p =>
+          {[{ k: "reports", l: "Inventory Report", d: "View & export inventory", c: P.r }, { k: "urgent", l: "Urgent Reports", d: "Critical events log", c: P.r }, { k: "employees", l: "Employees", d: "Manage team", c: P.bk }, { k: "categories", l: "Categories", d: "Add & remove categories", c: P.tn }].map(p =>
             <button key={p.k} onClick={() => setAdPg(p.k)} style={{ display: "block", width: "100%", textAlign: "left", padding: "16px 20px", background: "#fff", borderRadius: 14, border: `1px solid ${P.bd}`, borderLeft: `4px solid ${p.c}`, marginBottom: 10, cursor: "pointer", fontFamily: F.b }}><div style={{ fontWeight: 700, fontSize: 16 }}>{p.l}</div><div style={{ fontSize: 13, color: P.l, marginTop: 4 }}>{p.d}</div></button>)}
         </div>}
 
@@ -367,6 +368,27 @@ export default function App() {
           </div>)}
         </div>}
 
+        {adAuth && adPg === "urgent" && <div>
+          <button onClick={() => setAdPg("hub")} style={{ background: "none", border: "none", cursor: "pointer", color: P.r, fontSize: 14, fontWeight: 600, marginBottom: 16, fontFamily: F.b }}>← Admin</button>
+          <h2 style={{ fontFamily: F.h, fontSize: 20, fontWeight: 700, margin: "0 0 16px" }}>Urgent Reports</h2>
+          <div style={{ display: "flex", gap: 8, marginBottom: 16, flexWrap: "wrap" }}>
+            <select value={urgType} onChange={e => setUrgType(e.target.value)} style={{ ...iS, flex: 1 }}><option value="All">All Types</option><option value="depleted">Depleted</option><option value="damage">Damage</option><option value="delete">Delete</option><option value="edit">Edit</option></select>
+            <input type="date" value={urgStart} onChange={e => setUrgStart(e.target.value)} style={{ ...iS, flex: 1 }} placeholder="Start date" />
+            <input type="date" value={urgEnd} onChange={e => setUrgEnd(e.target.value)} style={{ ...iS, flex: 1 }} placeholder="End date" />
+          </div>
+          <div style={{ background: "#fff", borderRadius: 12, padding: 16, border: `1px solid ${P.bd}`, borderLeft: `3px solid ${P.r}`, marginBottom: 16 }}>
+            <div style={{ fontSize: 10, fontFamily: F.m, color: P.l, textTransform: "uppercase" }}>Showing</div>
+            <div style={{ fontSize: 28, fontWeight: 700, fontFamily: F.h }}>{urgRpts.filter(r => { if (urgType !== "All" && r.type !== urgType) return false; if (urgStart && new Date(r.created_at) < new Date(urgStart)) return false; if (urgEnd && new Date(r.created_at) > new Date(urgEnd)) return false; return true; }).length}<span style={{ fontSize: 14, color: P.m, fontWeight: 400 }}> events</span></div>
+          </div>
+          <Btn small onClick={() => { setET(""); setEM(true); }}>Email Report</Btn>
+          {urgRpts.filter(r => { if (urgType !== "All" && r.type !== urgType) return false; if (urgStart && new Date(r.created_at) < new Date(urgStart)) return false; if (urgEnd && new Date(r.created_at) > new Date(urgEnd)) return false; return true; }).map(r => <div key={r.id} style={{ padding: "12px 16px", background: "#fff", borderRadius: 12, border: `1px solid ${P.bd}`, marginBottom: 8, borderLeft: `3px solid ${P.r}`, marginTop: 16 }}>
+            <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 4 }}><span style={{ fontSize: 11, fontWeight: 700, color: P.r, textTransform: "uppercase", fontFamily: F.m }}>{r.type}</span><span style={{ fontSize: 11, color: P.l, fontFamily: F.m }}>{fD(r.created_at)}</span></div>
+            <div style={{ fontWeight: 600, fontSize: 14, marginBottom: 4 }}>{r.title}</div>
+            <div style={{ fontSize: 13, color: P.m, whiteSpace: "pre-wrap" }}>{r.message}</div>
+            <div style={{ fontSize: 12, color: P.l, marginTop: 4, fontFamily: F.m }}>by {r.user_name}</div>
+          </div>)}
+        </div>}
+
         {adAuth && adPg === "employees" && <div>
           <button onClick={() => setAdPg("hub")} style={{ background: "none", border: "none", cursor: "pointer", color: P.r, fontSize: 14, fontWeight: 600, marginBottom: 16, fontFamily: F.b }}>← Admin</button>
           <h2 style={{ fontFamily: F.h, fontSize: 20, fontWeight: 700, margin: "0 0 16px" }}>Employees</h2>
@@ -374,7 +396,7 @@ export default function App() {
             return <div key={u.id} style={{ padding: "12px 16px", background: "#fff", borderRadius: 12, border: `1px solid ${P.bd}`, marginBottom: 8, borderLeft: `3px solid ${u.active ? P.g : P.l}` }}>
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
                 <div><div style={{ fontWeight: 600, fontSize: 15, color: u.active ? P.tx : P.l }}>{u.name} {self && <span style={{ fontSize: 11, color: P.l }}>(you)</span>}</div><div style={{ fontSize: 11, fontFamily: F.m, color: P.l }}>{u.email} · <span style={{ color: P.r }}>{RL[u.role]}</span></div>{u.receives_reports && <div style={{ fontSize: 10, fontFamily: F.m, color: P.g, marginTop: 2 }}>✓ Receives reports</div>}</div>
-               {canE && <div style={{ display: "flex", flexDirection: "column", gap: 4, alignItems: "flex-end" }}>
+                {canE && <div style={{ display: "flex", flexDirection: "column", gap: 4, alignItems: "flex-end" }}>
                   {!self && <button onClick={() => { setEU(u.id); setEUN(u.name); setEUE(u.email); setEUP(u.pin); }} style={{ fontSize: 11, padding: "4px 10px", borderRadius: 6, border: `1px solid ${P.bd}`, background: "#fff", color: P.m, cursor: "pointer", fontFamily: F.m }}>Edit</button>}
                   {!self && <select value={u.role} onChange={e => chRole(u.id, e.target.value)} style={{ fontSize: 11, padding: "4px 8px", borderRadius: 6, border: `1px solid ${P.bd}`, fontFamily: F.m }}><option value="user">Employee</option><option value="admin">Admin</option>{isS && <option value="senior_admin">Sr Admin</option>}</select>}
                   <button onClick={() => togRpts(u.id, u.receives_reports)} style={{ fontSize: 11, padding: "4px 10px", borderRadius: 6, border: "none", background: u.receives_reports ? P.gB : P.bdL, color: u.receives_reports ? P.g : P.m, fontWeight: 600, cursor: "pointer", fontFamily: F.m }}>{u.receives_reports ? "Gets Reports" : "No Reports"}</button>
@@ -415,12 +437,11 @@ export default function App() {
         </div>
       </Fl>
       <Fl l="Note (required if Fair/Poor)"><input style={iS} value={retNote} onChange={e => setRetNote(e.target.value)} placeholder="What's the issue?" /></Fl>
-      {retCond !== "Good" && <div style={{ fontSize: 12, color: P.am, fontFamily: F.m, marginBottom: 12 }}>Admin will be notified about this condition.</div>}
       <Btn full disabled={retCond !== "Good" && !retNote.trim()} color={P.g} onClick={() => returnTool(retMod.co.id, retMod.co.tool_id, retMod.co.tool_name, retCond, retNote)}>Return Tool</Btn>
     </Modal>
 
     <Modal open={delMod.o && delMod.type === "tool"} onClose={() => setDelMod({ o: false, type: null, id: null, name: "" })} title="Delete Tool?">
-      <p style={{ color: P.m, marginBottom: 20 }}>Remove <strong>{delMod.name}</strong>? Admin will be notified.</p>
+      <p style={{ color: P.m, marginBottom: 20 }}>Remove <strong>{delMod.name}</strong>?</p>
       <div style={{ display: "flex", gap: 10 }}><button onClick={() => setDelMod({ o: false, type: null, id: null, name: "" })} style={{ flex: 1, padding: 12, borderRadius: 10, border: `1.5px solid ${P.bd}`, background: "#fff", color: P.m, fontWeight: 600, cursor: "pointer" }}>Cancel</button><Btn full color={P.r} onClick={() => delTool(delMod.id)} sx={{ flex: 1 }}>Delete</Btn></div>
     </Modal>
 
@@ -439,7 +460,7 @@ export default function App() {
 
     <Modal open={emailMod} onClose={() => setEM(false)} title="Email Report">
       <Fl l="Send to"><input style={iS} type="email" value={emailTo} onChange={e => setET(e.target.value)} placeholder="payroll@masterpiecelv.com" /></Fl>
-      <Btn full disabled={!emailTo.trim()} onClick={emailRpt}>Send</Btn>
+      <Btn full disabled={!emailTo.trim()} onClick={adPg === "urgent" ? emailUrg : emailRpt}>Send</Btn>
     </Modal>
 
     <Modal open={!!delUserMod} onClose={() => setDUM(null)} title="Delete Employee?">
