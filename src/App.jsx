@@ -68,7 +68,7 @@ export default function App() {
 
   const load = useCallback(async () => {
     try {
-      const [a, b, c, d, e, f, g] = await Promise.all([api("materials?order=name"), api("projects?order=name"), api("transactions?order=created_at.desc&limit=500"), api("tools?order=name"), api("tool_checkouts?order=checked_out_at.desc&limit=500"), api("categories?order=sort_order"), api("yard_users?order=name")]);
+      const [a, b, c, d, e, f, g] = await Promise.all([api("materials?order=name"), api("projects?order=name"), api("transactions?order=created_at.desc&limit=500"), api("tools?order=name"), api("tool_checkouts?order=checked_out_at.desc&limit=500"), api("categories?order=name"), api("yard_users?order=name")]);
       setMats(a); setProjs(b); setTxns(c); setTools(d); setCos(e); setCats(f); setUsers(g);
     } catch (e) { console.error(e); }
     setLoaded(true);
