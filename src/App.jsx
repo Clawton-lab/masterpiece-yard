@@ -234,14 +234,6 @@ export default function App() {
         <div style={{ display: "flex", gap: 6, overflowX: "auto", paddingBottom: 12 }}>
           {["All", ...cats.map(c => c.name).sort()].map(c => <button key={c} onClick={() => setFC(c)} style={{ padding: "6px 14px", borderRadius: 20, border: `1.5px solid ${fCat === c ? P.tn : P.bd}`, background: fCat === c ? P.tB : "#fff", color: fCat === c ? P.bk : P.m, fontSize: 12, fontWeight: 600, cursor: "pointer", whiteSpace: "nowrap" }}>{c}</button>)}
         </div>
-        {fCat === "Hardware" && <div style={{ background: "#fff", borderRadius: 12, padding: 16, border: `1px solid ${P.bd}`, borderTop: `2px solid ${P.r}`, marginBottom: 12 }}>
-          <Fl l="Search Hangers">
-            <input style={iS} value={hwSearch} onChange={async e => { setHwSearch(e.target.value); if (e.target.value.length >= 2) { const r = await searchHangers(e.target.value); setHwResults(r); } else setHwResults([]); }} placeholder="Type model or manufacturer..." />
-          </Fl>
-          {hwResults.length > 0 && <div style={{ maxHeight: 200, overflowY: "auto", border: `1px solid ${P.bd}`, borderRadius: 8 }}>
-            {hwResults.map(h => <button key={h.id} onClick={() => { setMatMod({ o: true, mat: { name: `${h.manufacturer} ${h.model}`, category: "Hardware", part_number: h.model, qty: 0, unit: "pcs", low_threshold: 5, location: "", notes: h.manufacturer, condition: "Good", type: "hardware" } }); setHwSearch(""); setHwResults([]); }} style={{ display: "block", width: "100%", textAlign: "left", padding: "10px 14px", background: "none", border: "none", borderBottom: `1px solid ${P.bdL}`, cursor: "pointer", fontFamily: F.b }}><div style={{ fontWeight: 600, fontSize: 14 }}>{h.model}</div><div style={{ fontSize: 12, color: P.l }}>{h.manufacturer}</div></button>)}
-          </div>}
-        </div>}
         {filtered.length === 0 ? <div style={{ padding: 40, textAlign: "center", color: P.l, fontFamily: F.m }}>No materials</div> : filtered.map(mat => {
           const st = gSt(mat.qty, mat.low_threshold);
           return <div key={mat.id} onClick={() => setDetail(mat.id)} style={{ background: "#fff", borderRadius: 14, padding: "14px 16px", marginBottom: 8, border: `1px solid ${st === "out" ? "rgba(196,30,42,.3)" : st === "low" ? "rgba(217,119,6,.3)" : P.bd}`, cursor: "pointer" }}>
