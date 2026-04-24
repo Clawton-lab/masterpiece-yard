@@ -435,9 +435,33 @@ function TxnSheet({ mat, mode, projs, onClose, onSubmit }) {
 
 function MatForm({ mat, cats, onSave, onCancel, isEdit, editReason, setEditReason }) {
   const [f, setF] = useState(mat || { name: "", category: "Hardscape", qty: 0, unit: "pcs", low_threshold: 5, location: "", notes: "", condition: "Good" });
+  const [hwSearch, setHwSearch] = useState(""); const [hwResults, setHwResults] = useState([]);
   const s = (k, v) => setF(p => ({ ...p, [k]: v }));
+  
   return <div>
-    <Fl l="Name"><input style={iS} value={f.name} onChange={e => s("name", e.target.value)} placeholder="e.g. Belgard Dublin Cobble" /></Fl>
+    <Fl l="Name">
+      <input style={iS} value={f.category === "Hardware" ? hwSearch : f.name} onChange={async e => { 
+        if (f.category === "Hardware") {
+          setHwSearch(e.target.value); 
+          s("name", e.target.value);
+          if (e.target.value.length >= 2) { 
+            const r = await searchHangers(e.target.value); 
+            setHwResults(r); 
+          } else setHwResults([]);
+        } else {
+          s("name", e.target.value);
+        }
+      }} placeholder={f.category === "Hardware" ? "Search hangers..." : "e.g. Belgard Dublin Cobble"} />
+      {f.category === "Hardware" && hwResults.length > 0 && <div style={{ maxHeight: 200, overflowY: "auto", border: `1px solid ${P.bd}`, borderRadius: 8, marginTop: 8 }}>
+        {hwResults.map(h => <button key={h.id} onClick={() => { 
+          s("name", `${h.manufacturer} ${h.model}`);
+          s("part_number", h.model);
+          s("notes", h.manufacturer);
+          setHwSearch(`${h.manufacturer} ${h.model}`);
+          setHwResults([]);
+        }} style={{ display: "block", width: "100%", textAlign: "left", padding: "10px 14px", background: "none", border: "none", borderBottom: `1px solid ${P.bdL}`, cursor: "pointer", fontFamily: F.b }}><div style={{ fontWeight: 600, fontSize: 14 }}>{h.model}</div><div style={{ fontSize: 12, color: P.l }}>{h.manufacturer}</div></button>)}
+      </div>}
+    </Fl>
     <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
       <Fl l="Category"><select style={{ ...iS, appearance: "none" }} value={f.category} onChange={e => s("category", e.target.value)}>{cats.map(c => <option key={c.name} value={c.name}>{c.name}</option>)}</select></Fl>
       <Fl l="Unit"><select style={{ ...iS, appearance: "none" }} value={f.unit} onChange={e => s("unit", e.target.value)}>{UNITS.map(u => <option key={u} value={u}>{u}</option>)}</select></Fl>
