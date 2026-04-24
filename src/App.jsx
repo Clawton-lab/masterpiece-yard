@@ -367,12 +367,14 @@ export default function App() {
             return <div key={u.id} style={{ padding: "12px 16px", background: "#fff", borderRadius: 12, border: `1px solid ${P.bd}`, marginBottom: 8, borderLeft: `3px solid ${u.active ? P.g : P.l}` }}>
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
                 <div><div style={{ fontWeight: 600, fontSize: 15, color: u.active ? P.tx : P.l }}>{u.name} {self && <span style={{ fontSize: 11, color: P.l }}>(you)</span>}</div><div style={{ fontSize: 11, fontFamily: F.m, color: P.l }}>{u.email} · <span style={{ color: P.r }}>{RL[u.role]}</span></div>{u.receives_reports && <div style={{ fontSize: 10, fontFamily: F.m, color: P.g, marginTop: 2 }}>✓ Receives reports</div>}</div>
-                {canE && !self && <div style={{ display: "flex", flexDirection: "column", gap: 4, alignItems: "flex-end" }}>
-                  <button onClick={() => { setEU(u.id); setEUN(u.name); setEUE(u.email); setEUP(u.pin); }} style={{ fontSize: 11, padding: "4px 10px", borderRadius: 6, border: `1px solid ${P.bd}`, background: "#fff", color: P.m, cursor: "pointer", fontFamily: F.m }}>Edit</button>
-                  <select value={u.role} onChange={e => chRole(u.id, e.target.value)} style={{ fontSize: 11, padding: "4px 8px", borderRadius: 6, border: `1px solid ${P.bd}`, fontFamily: F.m }}><option value="user">Employee</option><option value="admin">Admin</option>{isS && <option value="senior_admin">Sr Admin</option>}</select>
+               {canE && <div style={{ display: "flex", flexDirection: "column", gap: 4, alignItems: "flex-end" }}>
+                  {!self && <button onClick={() => { setEU(u.id); setEUN(u.name); setEUE(u.email); setEUP(u.pin); }} style={{ fontSize: 11, padding: "4px 10px", borderRadius: 6, border: `1px solid ${P.bd}`, background: "#fff", color: P.m, cursor: "pointer", fontFamily: F.m }}>Edit</button>}
+                  {!self && <select value={u.role} onChange={e => chRole(u.id, e.target.value)} style={{ fontSize: 11, padding: "4px 8px", borderRadius: 6, border: `1px solid ${P.bd}`, fontFamily: F.m }}><option value="user">Employee</option><option value="admin">Admin</option>{isS && <option value="senior_admin">Sr Admin</option>}</select>}
                   <button onClick={() => togRpts(u.id, u.receives_reports)} style={{ fontSize: 11, padding: "4px 10px", borderRadius: 6, border: "none", background: u.receives_reports ? P.gB : P.bdL, color: u.receives_reports ? P.g : P.m, fontWeight: 600, cursor: "pointer", fontFamily: F.m }}>{u.receives_reports ? "Gets Reports" : "No Reports"}</button>
-                  <button onClick={() => togUser(u.id, u.active)} style={{ fontSize: 11, padding: "4px 10px", borderRadius: 6, border: "none", background: u.active ? P.rB : P.gB, color: u.active ? P.r : P.g, fontWeight: 600, cursor: "pointer", fontFamily: F.m }}>{u.active ? "Deactivate" : "Activate"}</button>
-                  <button onClick={() => setDUM(u.id)} style={{ fontSize: 11, padding: "4px 10px", borderRadius: 6, border: "none", background: P.r, color: "#fff", fontWeight: 600, cursor: "pointer", fontFamily: F.m }}>Delete</button>
+                  {!self && <>
+                    <button onClick={() => togUser(u.id, u.active)} style={{ fontSize: 11, padding: "4px 10px", borderRadius: 6, border: "none", background: u.active ? P.rB : P.gB, color: u.active ? P.r : P.g, fontWeight: 600, cursor: "pointer", fontFamily: F.m }}>{u.active ? "Deactivate" : "Activate"}</button>
+                    <button onClick={() => setDUM(u.id)} style={{ fontSize: 11, padding: "4px 10px", borderRadius: 6, border: "none", background: P.r, color: "#fff", fontWeight: 600, cursor: "pointer", fontFamily: F.m }}>Delete</button>
+                  </>}
                 </div>}
               </div>
             </div>; })}
