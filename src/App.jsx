@@ -101,17 +101,25 @@ export default function App() {
     const mat = mats.find(x => x.id === matId), proj = projs.find(x => x.id === projId);
     const nq = md === "take" ? mat.qty - qty : mat.qty + qty;
     try {
+      await api("transactions", { method: "POST", body: JSON.stringify({ material_id: matId, material_name: mat.name, unit: mat.unit, qty, mode: md, project_id: projId || null, project_name: proj?.name || "", note, user_name: user.name, user_id: user.id }) });
+      
       if (md === "take" && nq <= 0) {
         await api(`materials?id=eq.${matId}`, { method: "DELETE" });
-        const rptEmails = users.filter(u => u.receives_reports).map(u => u.email).join(",");
-        if (rptEmails) notifyAdmin(rptEmails, `Material Depleted: ${mat.name}`, `${user.name} took the last ${qty} ${mat.unit} of ${mat.name}. Item removed from inventory.`);
+        const rptUsers = users.filter(u => u.receives_reports === true);
+        if (rptUsers.length > 0) {
+          const rptEmails = rptUsers.map(u => u.email).join(",");
+          notifyAdmin(rptEmails, `Material Depleted: ${mat.name}`, `${user.name} took the last ${qty} ${mat.unit} of ${mat.name}. Item removed from inventory.`);
+        }
       } else {
         await api(`materials?id=eq.${matId}`, { method: "PATCH", body: JSON.stringify({ qty: Math.max(0, nq) }) });
       }
-      await api("transactions", { method: "POST", body: JSON.stringify({ material_id: matId, material_name: mat.name, unit: mat.unit, qty, mode: md, project_id: projId || null, project_name: proj?.name || "", note, user_name: user.name, user_id: user.id }) });
+      
       await load(); setTxnMod({ o: false, m: "take", mat: null }); setDetail(null);
       show(md === "take" ? (nq <= 0 ? `Took last ${qty} ${mat.unit}` : `Took ${qty} ${mat.unit}`) : `Added ${qty} ${mat.unit}`);
-    } catch (e) { show("Error"); }
+    } catch (e) { 
+      console.error(e); 
+      show("Error: " + e.message); 
+    }
   };
 
   const delMat = async (id) => {
