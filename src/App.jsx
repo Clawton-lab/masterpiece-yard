@@ -29,7 +29,7 @@ function CondBadge({ c }) { const clr = COND_C[c] || P.am; return <span style={{
 function Toast({ msg, show }) { return <div style={{ position: "fixed", bottom: 80, left: "50%", transform: `translateX(-50%) translateY(${show ? 0 : 20}px)`, background: P.r, color: "#fff", padding: "12px 22px", borderRadius: 12, fontSize: 14, fontWeight: 600, opacity: show ? 1 : 0, transition: "all .3s", pointerEvents: "none", zIndex: 9999, maxWidth: "90%", textAlign: "center", fontFamily: F.b }}>{msg}</div>; }
 
 function Nav({ tab, set, isAdmin }) {
-  const ts = [{ k: "yard", l: "Yard" }, { k: "hardware", l: "Hardware" }, { k: "tools", l: "Tools" }, { k: "activity", l: "Activity" }, { k: "projects", l: "Projects" }];
+  const ts = [{ k: "yard", l: "Yard" }, { k: "tools", l: "Tools" }, { k: "activity", l: "Activity" }, { k: "projects", l: "Projects" }];
   if (isAdmin) ts.push({ k: "admin", l: "Admin" });
   return <nav style={{ position: "fixed", bottom: 0, left: 0, right: 0, zIndex: 900, background: "#fff", borderTop: `2px solid ${P.tn}`, display: "flex", justifyContent: "space-around", padding: "8px 0 env(safe-area-inset-bottom,8px)" }}>
     {ts.map(t => <button key={t.k} onClick={() => set(t.k)} style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 2, padding: "4px 8px", background: "none", border: "none", cursor: "pointer", color: tab === t.k ? P.r : P.l, borderTop: tab === t.k ? `2px solid ${P.r}` : "2px solid transparent", marginTop: -2 }}><span style={{ fontSize: 10, fontWeight: 700, fontFamily: F.m }}>{t.l}</span></button>)}
@@ -232,41 +232,21 @@ export default function App() {
           <Btn onClick={() => setMatMod({ o: true, mat: null })} sx={{ padding: "12px 14px" }}>+</Btn>
         </div>
         <div style={{ display: "flex", gap: 6, overflowX: "auto", paddingBottom: 12 }}>
-          {["All", ...cats.map(c => c.name)].map(c => <button key={c} onClick={() => setFC(c)} style={{ padding: "6px 14px", borderRadius: 20, border: `1.5px solid ${fCat === c ? P.tn : P.bd}`, background: fCat === c ? P.tB : "#fff", color: fCat === c ? P.bk : P.m, fontSize: 12, fontWeight: 600, cursor: "pointer", whiteSpace: "nowrap" }}>{c}</button>)}
+          {["All", ...cats.map(c => c.name).sort()].map(c => <button key={c} onClick={() => setFC(c)} style={{ padding: "6px 14px", borderRadius: 20, border: `1.5px solid ${fCat === c ? P.tn : P.bd}`, background: fCat === c ? P.tB : "#fff", color: fCat === c ? P.bk : P.m, fontSize: 12, fontWeight: 600, cursor: "pointer", whiteSpace: "nowrap" }}>{c}</button>)}
         </div>
+        {fCat === "Hardware" && <div style={{ background: "#fff", borderRadius: 12, padding: 16, border: `1px solid ${P.bd}`, borderTop: `2px solid ${P.r}`, marginBottom: 12 }}>
+          <Fl l="Search Hangers">
+            <input style={iS} value={hwSearch} onChange={async e => { setHwSearch(e.target.value); if (e.target.value.length >= 2) { const r = await searchHangers(e.target.value); setHwResults(r); } else setHwResults([]); }} placeholder="Type model or manufacturer..." />
+          </Fl>
+          {hwResults.length > 0 && <div style={{ maxHeight: 200, overflowY: "auto", border: `1px solid ${P.bd}`, borderRadius: 8 }}>
+            {hwResults.map(h => <button key={h.id} onClick={() => { setMatMod({ o: true, mat: { name: `${h.manufacturer} ${h.model}`, category: "Hardware", part_number: h.model, qty: 0, unit: "pcs", low_threshold: 5, location: "", notes: h.manufacturer, condition: "Good", type: "hardware" } }); setHwSearch(""); setHwResults([]); }} style={{ display: "block", width: "100%", textAlign: "left", padding: "10px 14px", background: "none", border: "none", borderBottom: `1px solid ${P.bdL}`, cursor: "pointer", fontFamily: F.b }}><div style={{ fontWeight: 600, fontSize: 14 }}>{h.model}</div><div style={{ fontSize: 12, color: P.l }}>{h.manufacturer}</div></button>)}
+          </div>}
+        </div>}
         {filtered.length === 0 ? <div style={{ padding: 40, textAlign: "center", color: P.l, fontFamily: F.m }}>No materials</div> : filtered.map(mat => {
           const st = gSt(mat.qty, mat.low_threshold);
           return <div key={mat.id} onClick={() => setDetail(mat.id)} style={{ background: "#fff", borderRadius: 14, padding: "14px 16px", marginBottom: 8, border: `1px solid ${st === "out" ? "rgba(196,30,42,.3)" : st === "low" ? "rgba(217,119,6,.3)" : P.bd}`, cursor: "pointer" }}>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 6 }}>
               <div style={{ flex: 1 }}><div style={{ fontSize: 15, fontWeight: 700 }}>{mat.name}</div><div style={{ fontSize: 11, color: P.l, fontFamily: F.m, marginTop: 2 }}>{mat.category} · {mat.location} <CondBadge c={mat.condition || "Good"} /></div></div>
-              <Pill s={st} />
-            </div>
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-              <div style={{ fontSize: 22, fontWeight: 700, fontFamily: F.h }}>{mat.qty}<span style={{ fontSize: 13, color: P.m, fontWeight: 400 }}> {mat.unit}</span></div>
-              <div style={{ display: "flex", gap: 6 }} onClick={e => e.stopPropagation()}>
-                <button onClick={() => setTxnMod({ o: true, m: "take", mat })} style={{ padding: "8px 14px", borderRadius: 8, border: "none", background: P.rB, color: P.r, fontSize: 13, fontWeight: 700, cursor: "pointer" }}>Take</button>
-                <button onClick={() => setTxnMod({ o: true, m: "add", mat })} style={{ padding: "8px 14px", borderRadius: 8, border: "none", background: P.gB, color: P.g, fontSize: 13, fontWeight: 700, cursor: "pointer" }}>Add</button>
-              </div>
-            </div>
-          </div>;
-        })}
-      </div>}
-
-      {tab === "hardware" && <div style={{ animation: "fadeIn .3s" }}>
-        <h2 style={{ fontFamily: F.h, fontSize: 20, fontWeight: 700, margin: "0 0 16px" }}>Hardware</h2>
-        <div style={{ background: "#fff", borderRadius: 16, padding: 20, border: `1px solid ${P.bd}`, borderTop: `3px solid ${P.r}`, marginBottom: 16 }}>
-          <Fl l="Search Hangers">
-            <input style={iS} value={hwSearch} onChange={async e => { setHwSearch(e.target.value); if (e.target.value.length >= 2) { const r = await searchHangers(e.target.value); setHwResults(r); } else setHwResults([]); }} placeholder="Type model or manufacturer..." />
-          </Fl>
-          {hwResults.length > 0 && <div style={{ maxHeight: 200, overflowY: "auto", border: `1px solid ${P.bd}`, borderRadius: 8, marginBottom: 12 }}>
-            {hwResults.map(h => <button key={h.id} onClick={() => { setHwSelected(h); setMatMod({ o: true, mat: { name: `${h.manufacturer} ${h.model}`, category: "Hardware", part_number: h.model, qty: 0, unit: "pcs", low_threshold: 5, location: "", notes: h.manufacturer, condition: "Good", type: "hardware" } }); setHwSearch(""); setHwResults([]); }} style={{ display: "block", width: "100%", textAlign: "left", padding: "10px 14px", background: "none", border: "none", borderBottom: `1px solid ${P.bdL}`, cursor: "pointer", fontFamily: F.b }}><div style={{ fontWeight: 600, fontSize: 14 }}>{h.model}</div><div style={{ fontSize: 12, color: P.l }}>{h.manufacturer}</div></button>)}
-          </div>}
-        </div>
-        {mats.filter(m => m.category === "Hardware").map(mat => {
-          const st = gSt(mat.qty, mat.low_threshold);
-          return <div key={mat.id} onClick={() => setDetail(mat.id)} style={{ background: "#fff", borderRadius: 14, padding: "14px 16px", marginBottom: 8, border: `1px solid ${st === "out" ? "rgba(196,30,42,.3)" : st === "low" ? "rgba(217,119,6,.3)" : P.bd}`, cursor: "pointer" }}>
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 6 }}>
-              <div style={{ flex: 1 }}><div style={{ fontSize: 15, fontWeight: 700 }}>{mat.name}</div><div style={{ fontSize: 11, color: P.l, fontFamily: F.m, marginTop: 2 }}>{mat.part_number} · {mat.location} <CondBadge c={mat.condition || "Good"} /></div></div>
               <Pill s={st} />
             </div>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
