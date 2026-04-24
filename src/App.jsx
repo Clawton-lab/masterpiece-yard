@@ -36,9 +36,9 @@ function Nav({ tab, set, isAdmin }) {
   </nav>;
 }
 
-function notifyAdmin(adminEmail, subject, body) {
-  if (!adminEmail) return;
-  window.open(`mailto:${adminEmail}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`, "_blank");
+function notifyAdmin(emails, subject, body) {
+  if (!emails) return;
+  window.open(`mailto:${emails}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`, "_blank");
 }
 
 export default function App() {
@@ -54,12 +54,11 @@ export default function App() {
   const [editReason, setEditReason] = useState("");
   const [projMod, setProjMod] = useState(false); const [nPN, setNPN] = useState(""); const [nPA, setNPA] = useState("");
   const [detail, setDetail] = useState(null); const [dProj, setDProj] = useState(null); const [pFilter, setPF] = useState("active");
-  const [hwSearch, setHwSearch] = useState(""); const [hwResults, setHwResults] = useState([]); const [hwSelected, setHwSelected] = useState(null);
   const [adPg, setAdPg] = useState("hub"); const [adAuth, setAdAuth] = useState(false);
   const [aaName, setAAN] = useState(""); const [aaPin, setAAP] = useState(""); const [aaErr, setAAE] = useState("");
   const [editUser, setEU] = useState(null); const [euN, setEUN] = useState(""); const [euE, setEUE] = useState(""); const [euP, setEUP] = useState("");
   const [delUserMod, setDUM] = useState(null);
-  const [nCat, setNC] = useState(""); const [adminEmail, setAdminEmail] = useState("");
+  const [nCat, setNC] = useState("");
   const [rptCat, setRptCat] = useState("All"); const [rptCond, setRptCond] = useState("All"); const [rptStock, setRptStock] = useState("All");
   const [emailMod, setEM] = useState(false); const [emailTo, setET] = useState("");
   const [retCond, setRetCond] = useState("Good"); const [retNote, setRetNote] = useState("");
@@ -78,8 +77,6 @@ export default function App() {
   useEffect(() => { if (user) load(); }, [user, load]);
   useEffect(() => { if (!user) return; const i = setInterval(load, 15000); return () => clearInterval(i); }, [user, load]);
 
-  useEffect(() => { if (users.length) { const sa = users.find(u => u.role === "super_admin"); if (sa) setAdminEmail(sa.email); } }, [users]);
-
   const login = async () => { setAErr(""); if (!aName.trim() || aPin.length !== 4) { setAErr("Enter name and 4-digit PIN."); return; } try { const all = await api("yard_users?active=eq.true"); const f = all.find(u => u.name.toLowerCase() === aName.trim().toLowerCase() && u.pin === aPin); if (!f) { setAErr("Name or PIN not found."); return; } setUser(f); show(`Welcome, ${f.name}!`); } catch (e) { setAErr("Connection error."); } };
   const signup = async () => { setAErr(""); if (!aName.trim() || !aEmail.trim() || aPin.length !== 4) { setAErr("Fill all fields."); return; } try { const ex = await api(`yard_users?email=eq.${encodeURIComponent(aEmail.toLowerCase().trim())}`); if (ex?.length) { setAErr("Email registered."); return; } const r = await api("yard_users", { method: "POST", body: JSON.stringify({ email: aEmail.toLowerCase().trim(), name: aName.trim(), pin: aPin, role: "user" }) }); if (r?.[0]) { setUser(r[0]); show(`Welcome!`); } } catch (e) { setAErr("Failed."); } };
 
@@ -87,7 +84,10 @@ export default function App() {
     try {
       if (mat.id) {
         await api(`materials?id=eq.${mat.id}`, { method: "PATCH", body: JSON.stringify(mat) });
-        if (reason && adminEmail) notifyAdmin(adminEmail, `Material Edited: ${mat.name}`, `${user.name} edited ${mat.name}\nReason: ${reason}`);
+        if (reason) {
+          const rptEmails = users.filter(u => u.receives_reports).map(u => u.email).join(",");
+          if (rptEmails) notifyAdmin(rptEmails, `Material Edited: ${mat.name}`, `${user.name} edited ${mat.name}\nReason: ${reason}`);
+        }
         show(`${mat.name} updated`);
       } else {
         await api("materials", { method: "POST", body: JSON.stringify(mat) });
@@ -97,32 +97,44 @@ export default function App() {
     } catch (e) { show("Error"); }
   };
 
- const doTxn = async (matId, qty, projId, note, md) => {
+  const doTxn = async (matId, qty, projId, note, md) => {
     const mat = mats.find(x => x.id === matId), proj = projs.find(x => x.id === projId);
     const nq = md === "take" ? mat.qty - qty : mat.qty + qty;
     try {
       if (md === "take" && nq <= 0) {
         await api(`materials?id=eq.${matId}`, { method: "DELETE" });
-        if (adminEmail) notifyAdmin(adminEmail, `Material Depleted & Deleted: ${mat.name}`, `${user.name} took the last ${qty} ${mat.unit} of ${mat.name}. Item has been removed from inventory.`);
+        const rptEmails = users.filter(u => u.receives_reports).map(u => u.email).join(",");
+        if (rptEmails) notifyAdmin(rptEmails, `Material Depleted: ${mat.name}`, `${user.name} took the last ${qty} ${mat.unit} of ${mat.name}. Item removed from inventory.`);
       } else {
         await api(`materials?id=eq.${matId}`, { method: "PATCH", body: JSON.stringify({ qty: Math.max(0, nq) }) });
       }
       await api("transactions", { method: "POST", body: JSON.stringify({ material_id: matId, material_name: mat.name, unit: mat.unit, qty, mode: md, project_id: projId || null, project_name: proj?.name || "", note, user_name: user.name, user_id: user.id }) });
       await load(); setTxnMod({ o: false, m: "take", mat: null }); setDetail(null);
-      show(md === "take" ? (nq <= 0 ? `Took last ${qty} ${mat.unit} - item deleted` : `Took ${qty} ${mat.unit}`) : `Added ${qty} ${mat.unit}`);
+      show(md === "take" ? (nq <= 0 ? `Took last ${qty} ${mat.unit}` : `Took ${qty} ${mat.unit}`) : `Added ${qty} ${mat.unit}`);
     } catch (e) { show("Error"); }
   };
 
   const delMat = async (id) => {
     const n = mats.find(m => m.id === id)?.name;
-    try { await api(`materials?id=eq.${id}`, { method: "DELETE" }); await load(); setDelMod({ o: false, type: null, id: null, name: "" }); setDetail(null); if (adminEmail) notifyAdmin(adminEmail, `Material Deleted: ${n}`, `${user.name} deleted material: ${n}`); show(`${n} removed`); } catch (e) { show("Error"); }
+    try { 
+      await api(`materials?id=eq.${id}`, { method: "DELETE" }); 
+      await load(); 
+      setDelMod({ o: false, type: null, id: null, name: "" }); 
+      setDetail(null); 
+      const rptEmails = users.filter(u => u.receives_reports).map(u => u.email).join(",");
+      if (rptEmails) notifyAdmin(rptEmails, `Material Deleted: ${n}`, `${user.name} deleted material: ${n}`); 
+      show(`${n} removed`); 
+    } catch (e) { show("Error"); }
   };
 
   const saveTool = async (tool, reason) => {
     try {
       if (tool.id) {
         await api(`tools?id=eq.${tool.id}`, { method: "PATCH", body: JSON.stringify(tool) });
-        if (reason && adminEmail) notifyAdmin(adminEmail, `Tool Edited: ${tool.name}`, `${user.name} edited ${tool.name}\nReason: ${reason}`);
+        if (reason) {
+          const rptEmails = users.filter(u => u.receives_reports).map(u => u.email).join(",");
+          if (rptEmails) notifyAdmin(rptEmails, `Tool Edited: ${tool.name}`, `${user.name} edited ${tool.name}\nReason: ${reason}`);
+        }
         show(`${tool.name} updated`);
       } else {
         await api("tools", { method: "POST", body: JSON.stringify(tool) });
@@ -141,14 +153,24 @@ export default function App() {
     try {
       await api(`tool_checkouts?id=eq.${coId}`, { method: "PATCH", body: JSON.stringify({ returned_at: new Date().toISOString(), note: note ? `Returned: ${cond}. ${note}` : `Returned: ${cond}` }) });
       await api(`tools?id=eq.${toolId}`, { method: "PATCH", body: JSON.stringify({ condition: cond, notes: note || undefined }) });
-      if (cond !== "Good" && adminEmail) notifyAdmin(adminEmail, `Tool Returned Damaged: ${toolName}`, `${user.name} returned ${toolName}\nCondition: ${cond}\nNote: ${note || "none"}`);
+      if (cond !== "Good") {
+        const rptEmails = users.filter(u => u.receives_reports).map(u => u.email).join(",");
+        if (rptEmails) notifyAdmin(rptEmails, `Tool Returned Damaged: ${toolName}`, `${user.name} returned ${toolName}\nCondition: ${cond}\nNote: ${note || "none"}`);
+      }
       await load(); setRetMod({ o: false, co: null }); setRetCond("Good"); setRetNote(""); show(`${toolName} returned — ${cond}`);
     } catch (e) { show("Error"); }
   };
 
   const delTool = async (id) => {
     const n = tools.find(t => t.id === id)?.name;
-    try { await api(`tools?id=eq.${id}`, { method: "DELETE" }); await load(); setDelMod({ o: false, type: null, id: null, name: "" }); if (adminEmail) notifyAdmin(adminEmail, `Tool Deleted: ${n}`, `${user.name} deleted tool: ${n}`); show(`${n} removed`); } catch (e) { show("Error"); }
+    try { 
+      await api(`tools?id=eq.${id}`, { method: "DELETE" }); 
+      await load(); 
+      setDelMod({ o: false, type: null, id: null, name: "" }); 
+      const rptEmails = users.filter(u => u.receives_reports).map(u => u.email).join(",");
+      if (rptEmails) notifyAdmin(rptEmails, `Tool Deleted: ${n}`, `${user.name} deleted tool: ${n}`); 
+      show(`${n} removed`); 
+    } catch (e) { show("Error"); }
   };
 
   const saveProj = async () => { if (!nPN.trim()) return; try { await api("projects", { method: "POST", body: JSON.stringify({ name: nPN.trim(), address: nPA.trim() }) }); await load(); setProjMod(false); setNPN(""); setNPA(""); show("Added"); } catch (e) { show("Error"); } };
@@ -157,6 +179,7 @@ export default function App() {
   const delCat = async (id, n) => { try { await api(`categories?id=eq.${id}`, { method: "DELETE" }); await load(); show(`"${n}" removed`); } catch (e) { show("Error"); } };
   const togUser = async (id, a) => { try { await api(`yard_users?id=eq.${id}`, { method: "PATCH", body: JSON.stringify({ active: !a }) }); await load(); show(a ? "Deactivated" : "Activated"); } catch (e) { show("Error"); } };
   const chRole = async (id, r) => { try { await api(`yard_users?id=eq.${id}`, { method: "PATCH", body: JSON.stringify({ role: r }) }); await load(); show("Updated"); } catch (e) { show("Error"); } };
+  const togRpts = async (id, r) => { try { await api(`yard_users?id=eq.${id}`, { method: "PATCH", body: JSON.stringify({ receives_reports: !r }) }); await load(); show("Updated"); } catch (e) { show("Error"); } };
   const saveEU = async () => { if (!euN.trim() || !euE.trim() || euP.length !== 4) { show("Fill all fields"); return; } try { await api(`yard_users?id=eq.${editUser}`, { method: "PATCH", body: JSON.stringify({ name: euN.trim(), email: euE.toLowerCase().trim(), pin: euP }) }); await load(); setEU(null); show("Updated"); } catch (e) { show("Error"); } };
   const delUser = async (id) => { try { await api(`yard_users?id=eq.${id}`, { method: "DELETE" }); await load(); setDUM(null); show("Employee deleted"); } catch (e) { show("Error"); } };
 
@@ -306,7 +329,7 @@ export default function App() {
 
         {adAuth && adPg === "hub" && <div>
           <h2 style={{ fontFamily: F.h, fontSize: 20, fontWeight: 700, margin: "0 0 20px" }}>Admin</h2>
-          {[{ k: "reports", l: "Inventory Report", d: "View & export inventory", c: P.r }, { k: "employees", l: "Employees", d: "Manage team", c: P.bk }, { k: "categories", l: "Categories", d: "Add & remove categories", c: P.tn }, { k: "settings", l: "Settings", d: "Notification email", c: P.am }].map(p =>
+          {[{ k: "reports", l: "Inventory Report", d: "View & export inventory", c: P.r }, { k: "employees", l: "Employees", d: "Manage team", c: P.bk }, { k: "categories", l: "Categories", d: "Add & remove categories", c: P.tn }].map(p =>
             <button key={p.k} onClick={() => setAdPg(p.k)} style={{ display: "block", width: "100%", textAlign: "left", padding: "16px 20px", background: "#fff", borderRadius: 14, border: `1px solid ${P.bd}`, borderLeft: `4px solid ${p.c}`, marginBottom: 10, cursor: "pointer", fontFamily: F.b }}><div style={{ fontWeight: 700, fontSize: 16 }}>{p.l}</div><div style={{ fontSize: 13, color: P.l, marginTop: 4 }}>{p.d}</div></button>)}
         </div>}
 
@@ -335,10 +358,11 @@ export default function App() {
           {users.map(u => { const canE = RO[user.role] > RO[u.role] || user.role === "super_admin"; const self = u.id === user.id;
             return <div key={u.id} style={{ padding: "12px 16px", background: "#fff", borderRadius: 12, border: `1px solid ${P.bd}`, marginBottom: 8, borderLeft: `3px solid ${u.active ? P.g : P.l}` }}>
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
-                <div><div style={{ fontWeight: 600, fontSize: 15, color: u.active ? P.tx : P.l }}>{u.name} {self && <span style={{ fontSize: 11, color: P.l }}>(you)</span>}</div><div style={{ fontSize: 11, fontFamily: F.m, color: P.l }}>{u.email} · <span style={{ color: P.r }}>{RL[u.role]}</span></div></div>
+                <div><div style={{ fontWeight: 600, fontSize: 15, color: u.active ? P.tx : P.l }}>{u.name} {self && <span style={{ fontSize: 11, color: P.l }}>(you)</span>}</div><div style={{ fontSize: 11, fontFamily: F.m, color: P.l }}>{u.email} · <span style={{ color: P.r }}>{RL[u.role]}</span></div>{u.receives_reports && <div style={{ fontSize: 10, fontFamily: F.m, color: P.g, marginTop: 2 }}>✓ Receives reports</div>}</div>
                 {canE && !self && <div style={{ display: "flex", flexDirection: "column", gap: 4, alignItems: "flex-end" }}>
                   <button onClick={() => { setEU(u.id); setEUN(u.name); setEUE(u.email); setEUP(u.pin); }} style={{ fontSize: 11, padding: "4px 10px", borderRadius: 6, border: `1px solid ${P.bd}`, background: "#fff", color: P.m, cursor: "pointer", fontFamily: F.m }}>Edit</button>
                   <select value={u.role} onChange={e => chRole(u.id, e.target.value)} style={{ fontSize: 11, padding: "4px 8px", borderRadius: 6, border: `1px solid ${P.bd}`, fontFamily: F.m }}><option value="user">Employee</option><option value="admin">Admin</option>{isS && <option value="senior_admin">Sr Admin</option>}</select>
+                  <button onClick={() => togRpts(u.id, u.receives_reports)} style={{ fontSize: 11, padding: "4px 10px", borderRadius: 6, border: "none", background: u.receives_reports ? P.gB : P.bdL, color: u.receives_reports ? P.g : P.m, fontWeight: 600, cursor: "pointer", fontFamily: F.m }}>{u.receives_reports ? "Gets Reports" : "No Reports"}</button>
                   <button onClick={() => togUser(u.id, u.active)} style={{ fontSize: 11, padding: "4px 10px", borderRadius: 6, border: "none", background: u.active ? P.rB : P.gB, color: u.active ? P.r : P.g, fontWeight: 600, cursor: "pointer", fontFamily: F.m }}>{u.active ? "Deactivate" : "Activate"}</button>
                   <button onClick={() => setDUM(u.id)} style={{ fontSize: 11, padding: "4px 10px", borderRadius: 6, border: "none", background: P.r, color: "#fff", fontWeight: 600, cursor: "pointer", fontFamily: F.m }}>Delete</button>
                 </div>}
@@ -351,16 +375,6 @@ export default function App() {
           <h2 style={{ fontFamily: F.h, fontSize: 20, fontWeight: 700, margin: "0 0 16px" }}>Categories</h2>
           {cats.map(c => <div key={c.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "10px 14px", background: "#fff", borderRadius: 10, border: `1px solid ${P.bd}`, marginBottom: 6 }}><span style={{ fontSize: 14, fontWeight: 600 }}>{c.name}</span><button onClick={() => delCat(c.id, c.name)} style={{ background: P.rB, border: "none", color: P.r, padding: "4px 10px", borderRadius: 6, fontSize: 11, fontWeight: 600, cursor: "pointer", fontFamily: F.m }}>Remove</button></div>)}
           <div style={{ display: "flex", gap: 8, marginTop: 12 }}><input style={{ ...iS, flex: 1, fontSize: 14 }} value={nCat} onChange={e => setNC(e.target.value)} placeholder="New category" onKeyDown={e => { if (e.key === "Enter") addCat(); }} /><Btn small onClick={addCat}>+</Btn></div>
-        </div>}
-
-        {adAuth && adPg === "settings" && <div>
-          <button onClick={() => setAdPg("hub")} style={{ background: "none", border: "none", cursor: "pointer", color: P.r, fontSize: 14, fontWeight: 600, marginBottom: 16, fontFamily: F.b }}>← Admin</button>
-          <h2 style={{ fontFamily: F.h, fontSize: 20, fontWeight: 700, margin: "0 0 16px" }}>Settings</h2>
-          <div style={{ background: "#fff", borderRadius: 14, border: `1px solid ${P.bd}`, padding: 16, borderTop: `3px solid ${P.r}` }}>
-            <h3 style={{ fontSize: 13, fontFamily: F.m, margin: "0 0 12px" }}>NOTIFICATION EMAIL</h3>
-            <Fl l="Admin notifications go to"><input style={iS} type="email" value={adminEmail} onChange={e => setAdminEmail(e.target.value)} placeholder="admin@masterpiecelv.com" /></Fl>
-            <div style={{ fontSize: 12, color: P.l, fontFamily: F.m }}>Gets notified on: deletions, edits, damaged tool returns</div>
-          </div>
         </div>}
       </div>}
     </div>
