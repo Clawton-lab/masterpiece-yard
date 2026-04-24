@@ -97,14 +97,19 @@ export default function App() {
     } catch (e) { show("Error"); }
   };
 
-  const doTxn = async (matId, qty, projId, note, md) => {
+ const doTxn = async (matId, qty, projId, note, md) => {
     const mat = mats.find(x => x.id === matId), proj = projs.find(x => x.id === projId);
     const nq = md === "take" ? mat.qty - qty : mat.qty + qty;
     try {
-      await api(`materials?id=eq.${matId}`, { method: "PATCH", body: JSON.stringify({ qty: Math.max(0, nq) }) });
+      if (md === "take" && nq <= 0) {
+        await api(`materials?id=eq.${matId}`, { method: "DELETE" });
+        if (adminEmail) notifyAdmin(adminEmail, `Material Depleted & Deleted: ${mat.name}`, `${user.name} took the last ${qty} ${mat.unit} of ${mat.name}. Item has been removed from inventory.`);
+      } else {
+        await api(`materials?id=eq.${matId}`, { method: "PATCH", body: JSON.stringify({ qty: Math.max(0, nq) }) });
+      }
       await api("transactions", { method: "POST", body: JSON.stringify({ material_id: matId, material_name: mat.name, unit: mat.unit, qty, mode: md, project_id: projId || null, project_name: proj?.name || "", note, user_name: user.name, user_id: user.id }) });
       await load(); setTxnMod({ o: false, m: "take", mat: null }); setDetail(null);
-      show(md === "take" ? `Took ${qty} ${mat.unit}` : `Added ${qty} ${mat.unit}`);
+      show(md === "take" ? (nq <= 0 ? `Took last ${qty} ${mat.unit} - item deleted` : `Took ${qty} ${mat.unit}`) : `Added ${qty} ${mat.unit}`);
     } catch (e) { show("Error"); }
   };
 
