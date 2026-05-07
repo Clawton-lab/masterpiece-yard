@@ -139,7 +139,12 @@ export default function App() {
 
   const delMat = async (id) => {
     const n = mats.find(m => m.id === id)?.name;
-    try { await api(`materials?id=eq.${id}`, { method: "DELETE" }); await load(); setDelMod({ o: false, type: null, id: null, name: "" }); setDetail(null); if (adminEmail) notifyAdmin(adminEmail, `Material Deleted: ${n}`, `${user.name} deleted material: ${n}`); show(`${n} removed`); } catch (e) { show("Error"); }
+    try { await api(`materials?id=eq.${id}`, { method: "PATCH", body: JSON.stringify({ deleted: true }) }); await load(); setDelMod({ o: false, type: null, id: null, name: "" }); setDetail(null); if (adminEmail) notifyAdmin(adminEmail, `Material Deleted: ${n}`, `${user.name} deleted material: ${n}`); show(`${n} removed`); } catch (e) { show("Error"); }
+  };
+
+  const restoreMat = async (id) => {
+    const n = mats.find(m => m.id === id)?.name;
+    try { await api(`materials?id=eq.${id}`, { method: "PATCH", body: JSON.stringify({ deleted: false }) }); await load(); show(`${n} restored`); } catch (e) { show("Error"); }
   };
 
   const saveTool = async (tool, reason) => {
@@ -195,12 +200,13 @@ export default function App() {
   const saveEU = async () => { if (!euN.trim() || !euE.trim() || euP.length !== 4) { show("Fill all fields"); return; } try { await api(`yard_users?id=eq.${editUser}`, { method: "PATCH", body: JSON.stringify({ name: euN.trim(), email: euE.toLowerCase().trim(), pin: euP }) }); await load(); setEU(null); show("Updated"); } catch (e) { show("Error"); } };
   const delUser = async (id) => { try { await api(`yard_users?id=eq.${id}`, { method: "DELETE" }); await load(); setDUM(null); show("Employee deleted"); } catch (e) { show("Error"); } };
 
-  const lowS = mats.filter(m => gSt(m.qty, m.low_threshold) !== "good");
+  const lowS = mats.filter(m => !m.deleted && gSt(m.qty, m.low_threshold) !== "good");
   const actCo = cos.filter(c => !c.returned_at);
   const alertN = lowS.length + actCo.filter(c => (Date.now() - new Date(c.checked_out_at)) / 86400000 > 7).length;
-  const filtered = mats.filter(m => { const q = search.toLowerCase(); return (!q || m.name.toLowerCase().includes(q) || m.location.toLowerCase().includes(q) || (m.notes || "").toLowerCase().includes(q)) && (fCat === "All" || m.category === fCat); });
+  const filtered = mats.filter(m => { if (m.deleted) return false; const q = search.toLowerCase(); return (!q || m.name.toLowerCase().includes(q) || m.location.toLowerCase().includes(q) || (m.notes || "").toLowerCase().includes(q)) && (fCat === "All" || m.category === fCat); });
+  const deletedMats = mats.filter(m => m.deleted);
 
-  const rptMats = mats.filter(m => { if (rptCat !== "All" && m.category !== rptCat) return false; if (rptCond !== "All" && (m.condition || "Good") !== rptCond) return false; if (rptStock === "low") return gSt(m.qty, m.low_threshold) !== "good"; if (rptStock === "out") return m.qty <= 0; return true; });
+  const rptMats = mats.filter(m => { if (m.deleted) return false; if (rptCat !== "All" && m.category !== rptCat) return false; if (rptCond !== "All" && (m.condition || "Good") !== rptCond) return false; if (rptStock === "low") return gSt(m.qty, m.low_threshold) !== "good"; if (rptStock === "out") return m.qty <= 0; return true; });
   const mkCSV = () => { const r = [["Name", "Category", "Qty", "Unit", "Condition", "Location", "Notes", "Low Threshold"]]; rptMats.forEach(m => r.push([m.name, m.category, m.qty, m.unit, m.condition || "Good", m.location, m.notes, m.low_threshold])); return r.map(x => x.join(",")).join("\n"); };
   const dlCSV = () => { const b = new Blob([mkCSV()], { type: "text/csv" }); const u = URL.createObjectURL(b); const a = document.createElement("a"); a.href = u; a.download = `inventory-${new Date().toISOString().slice(0, 10)}.csv`; a.click(); URL.revokeObjectURL(u); show("Downloaded"); };
   const emailRpt = () => { if (!emailTo.trim()) return; const ln = [`Masterpiece Inventory Report`, `Items: ${rptMats.length}`, "", "Name | Category | Qty | Unit | Condition | Location"]; rptMats.forEach(m => ln.push(`${m.name} | ${m.category} | ${m.qty} ${m.unit} | ${m.condition || "Good"} | ${m.location}`)); window.open(`mailto:${emailTo.trim()}?subject=${encodeURIComponent("Inventory Report")}&body=${encodeURIComponent(ln.join("\n"))}`); setEM(false); show("Opening email"); };
@@ -349,7 +355,7 @@ export default function App() {
 
         {adAuth && adPg === "hub" && <div>
           <h2 style={{ fontFamily: F.h, fontSize: 20, fontWeight: 700, margin: "0 0 20px" }}>Admin</h2>
-          {[{ k: "reports", l: "Inventory Report", d: "View & export inventory", c: P.r }, { k: "employees", l: "Employees", d: "Manage team", c: P.bk }, { k: "categories", l: "Categories", d: "Add & remove categories", c: P.tn }, { k: "settings", l: "Settings", d: "Notification email", c: P.am }].map(p =>
+          {[{ k: "reports", l: "Inventory Report", d: "View & export inventory", c: P.r }, { k: "employees", l: "Employees", d: "Manage team", c: P.bk }, { k: "categories", l: "Categories", d: "Add & remove categories", c: P.tn }, { k: "deleted", l: "Deleted Items", d: "Restore deleted materials", c: P.l }, { k: "settings", l: "Settings", d: "Notification email", c: P.am }].map(p =>
             <button key={p.k} onClick={() => setAdPg(p.k)} style={{ display: "block", width: "100%", textAlign: "left", padding: "16px 20px", background: "#fff", borderRadius: 14, border: `1px solid ${P.bd}`, borderLeft: `4px solid ${p.c}`, marginBottom: 10, cursor: "pointer", fontFamily: F.b }}><div style={{ fontWeight: 700, fontSize: 16 }}>{p.l}</div><div style={{ fontSize: 13, color: P.l, marginTop: 4 }}>{p.d}</div></button>)}
         </div>}
 
@@ -394,6 +400,16 @@ export default function App() {
           <h2 style={{ fontFamily: F.h, fontSize: 20, fontWeight: 700, margin: "0 0 16px" }}>Categories</h2>
           {cats.map(c => <div key={c.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "10px 14px", background: "#fff", borderRadius: 10, border: `1px solid ${P.bd}`, marginBottom: 6 }}><span style={{ fontSize: 14, fontWeight: 600 }}>{c.name}</span><button onClick={() => delCat(c.id, c.name)} style={{ background: P.rB, border: "none", color: P.r, padding: "4px 10px", borderRadius: 6, fontSize: 11, fontWeight: 600, cursor: "pointer", fontFamily: F.m }}>Remove</button></div>)}
           <div style={{ display: "flex", gap: 8, marginTop: 12 }}><input style={{ ...iS, flex: 1, fontSize: 14 }} value={nCat} onChange={e => setNC(e.target.value)} placeholder="New category" onKeyDown={e => { if (e.key === "Enter") addCat(); }} /><Btn small onClick={addCat}>+</Btn></div>
+        </div>}
+
+        {adAuth && adPg === "deleted" && <div>
+          <button onClick={() => setAdPg("hub")} style={{ background: "none", border: "none", cursor: "pointer", color: P.r, fontSize: 14, fontWeight: 600, marginBottom: 16, fontFamily: F.b }}>← Admin</button>
+          <h2 style={{ fontFamily: F.h, fontSize: 20, fontWeight: 700, margin: "0 0 16px" }}>Deleted Items</h2>
+          {deletedMats.length === 0 && <div style={{ textAlign: "center", padding: "40px 20px", color: P.l, fontFamily: F.m }}>No deleted items</div>}
+          {deletedMats.map(m => <div key={m.id} style={{ padding: "10px 14px", background: "#fff", borderRadius: 10, border: `1px solid ${P.bd}`, borderLeft: `3px solid ${P.l}`, marginBottom: 6, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+            <div><div style={{ fontWeight: 600, fontSize: 14, color: P.l }}>{m.name}</div><div style={{ fontSize: 11, color: P.l, fontFamily: F.m }}>{m.category} · {m.qty} {m.unit}</div></div>
+            <button onClick={() => restoreMat(m.id)} style={{ background: P.gB, border: "none", color: P.g, padding: "6px 12px", borderRadius: 6, fontSize: 12, fontWeight: 600, cursor: "pointer", fontFamily: F.m }}>Restore</button>
+          </div>)}
         </div>}
 
         {adAuth && adPg === "settings" && <div>
