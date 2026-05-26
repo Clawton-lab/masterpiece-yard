@@ -8,7 +8,7 @@ async function searchHangers(q) { if (!q || q.length < 2) return []; const r = a
 
 const RO = { super_admin: 4, senior_admin: 3, admin: 2, user: 1 };
 const RL = { super_admin: "Owner", senior_admin: "Sr Admin", admin: "Admin", user: "Employee" };
-const UNITS = ["qty", "pcs", "SF", "LF", "bags", "boxes", "pallets", "rolls", "each"];
+const UNITS = ["bags", "boxes", "each", "LF", "pallets", "pcs", "qty", "rolls", "SF"];
 const CONDS = ["Good", "Fair", "Poor"];
 const P = { bg: "#faf8f5", c: "#fff", bd: "#e5e0d8", bdL: "#f0ece6", tx: "#1a1a1a", m: "#6b6560", l: "#9c9590", r: "#c41e2a", rB: "rgba(196,30,42,0.06)", tn: "#c4b59a", tB: "rgba(196,181,154,0.12)", bk: "#1a1a1a", g: "#16a34a", gB: "rgba(22,163,74,0.08)", am: "#d97706", aB: "rgba(217,119,6,0.08)" };
 const F = { h: "'Bitter',serif", b: "'Source Sans 3',sans-serif", m: "'IBM Plex Mono',monospace" };
@@ -99,7 +99,7 @@ export default function App() {
 
   const load = useCallback(async () => {
     try {
-      const [a, b, c, d, e, f, g] = await Promise.all([api("materials?order=name"), api("projects?order=name"), api("transactions?order=created_at.desc&limit=200"), api("tools?order=name"), api("tool_checkouts?order=checked_out_at.desc&limit=200"), api("categories?order=sort_order"), api("yard_users?order=name")]);
+      const [a, b, c, d, e, f, g] = await Promise.all([api("materials?order=name"), api("projects?is_supplier=eq.false&order=name"), api("transactions?order=created_at.desc&limit=200"), api("tools?order=name"), api("tool_checkouts?order=checked_out_at.desc&limit=200"), api("categories?order=sort_order"), api("yard_users?order=name")]);
       setMats(a); setProjs(b); setTxns(c); setTools(d); setCos(e); setCats(f); setUsers(g);
     } catch (e) { console.error(e); }
     setLoaded(true);
@@ -363,7 +363,7 @@ export default function App() {
           <button onClick={() => setAdPg("hub")} style={{ background: "none", border: "none", cursor: "pointer", color: P.r, fontSize: 14, fontWeight: 600, marginBottom: 16, fontFamily: F.b }}>← Admin</button>
           <h2 style={{ fontFamily: F.h, fontSize: 20, fontWeight: 700, margin: "0 0 16px" }}>Inventory Report</h2>
           <div style={{ display: "flex", gap: 8, marginBottom: 16, flexWrap: "wrap" }}>
-            <select value={rptCat} onChange={e => setRptCat(e.target.value)} style={{ ...iS, flex: 1 }}><option value="All">All Categories</option>{cats.map(c => <option key={c.name} value={c.name}>{c.name}</option>)}</select>
+            <select value={rptCat} onChange={e => setRptCat(e.target.value)} style={{ ...iS, flex: 1 }}><option value="All">All Categories</option>{[...cats].sort((a, b) => a.name.localeCompare(b.name)).map(c => <option key={c.name} value={c.name}>{c.name}</option>)}</select>
             <select value={rptCond} onChange={e => setRptCond(e.target.value)} style={{ ...iS, flex: 1 }}><option value="All">All Conditions</option>{CONDS.map(c => <option key={c} value={c}>{c}</option>)}</select>
             <select value={rptStock} onChange={e => setRptStock(e.target.value)} style={{ ...iS, flex: 1 }}><option value="All">All Stock</option><option value="low">Low & Out Only</option><option value="out">Out Only</option></select>
           </div>
@@ -398,7 +398,7 @@ export default function App() {
         {adAuth && adPg === "categories" && <div>
           <button onClick={() => setAdPg("hub")} style={{ background: "none", border: "none", cursor: "pointer", color: P.r, fontSize: 14, fontWeight: 600, marginBottom: 16, fontFamily: F.b }}>← Admin</button>
           <h2 style={{ fontFamily: F.h, fontSize: 20, fontWeight: 700, margin: "0 0 16px" }}>Categories</h2>
-          {cats.map(c => <div key={c.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "10px 14px", background: "#fff", borderRadius: 10, border: `1px solid ${P.bd}`, marginBottom: 6 }}><span style={{ fontSize: 14, fontWeight: 600 }}>{c.name}</span><button onClick={() => delCat(c.id, c.name)} style={{ background: P.rB, border: "none", color: P.r, padding: "4px 10px", borderRadius: 6, fontSize: 11, fontWeight: 600, cursor: "pointer", fontFamily: F.m }}>Remove</button></div>)}
+          {[...cats].sort((a, b) => a.name.localeCompare(b.name)).map(c => <div key={c.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "10px 14px", background: "#fff", borderRadius: 10, border: `1px solid ${P.bd}`, marginBottom: 6 }}><span style={{ fontSize: 14, fontWeight: 600 }}>{c.name}</span><button onClick={() => delCat(c.id, c.name)} style={{ background: P.rB, border: "none", color: P.r, padding: "4px 10px", borderRadius: 6, fontSize: 11, fontWeight: 600, cursor: "pointer", fontFamily: F.m }}>Remove</button></div>)}
           <div style={{ display: "flex", gap: 8, marginTop: 12 }}><input style={{ ...iS, flex: 1, fontSize: 14 }} value={nCat} onChange={e => setNC(e.target.value)} placeholder="New category" onKeyDown={e => { if (e.key === "Enter") addCat(); }} /><Btn small onClick={addCat}>+</Btn></div>
         </div>}
 
@@ -504,7 +504,7 @@ function MatForm({ mat, cats, onSave, onCancel, isEdit, editReason, setEditReaso
   return <div>
     <Fl l="Name"><input style={iS} value={f.name} onChange={e => s("name", e.target.value)} placeholder="e.g. Belgard Dublin Cobble" /></Fl>
     <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
-      <Fl l="Category"><select style={{ ...iS, appearance: "none" }} value={f.category} onChange={e => s("category", e.target.value)}>{cats.map(c => <option key={c.name} value={c.name}>{c.name}</option>)}</select></Fl>
+      <Fl l="Category"><select style={{ ...iS, appearance: "none" }} value={f.category} onChange={e => s("category", e.target.value)}>{[...cats].sort((a, b) => a.name.localeCompare(b.name)).map(c => <option key={c.name} value={c.name}>{c.name}</option>)}</select></Fl>
       <Fl l="Unit"><select style={{ ...iS, appearance: "none" }} value={f.unit} onChange={e => s("unit", e.target.value)}>{UNITS.map(u => <option key={u} value={u}>{u}</option>)}</select></Fl>
       <Fl l="Qty"><input style={iS} type="number" min="0" value={f.qty} onChange={e => s("qty", parseInt(e.target.value) || 0)} /></Fl>
       <Fl l="Low Alert"><input style={iS} type="number" min="0" value={f.low_threshold} onChange={e => s("low_threshold", parseInt(e.target.value) || 0)} /></Fl>
