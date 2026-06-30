@@ -1,9 +1,60 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 
-const SB = "https://lvhqfslhcpiwshgvrnlp.supabase.co";
-const KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imx2aHFmc2xoY3Bpd3NoZ3ZybmxwIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzU3NjU5MTMsImV4cCI6MjA5MTM0MTkxM30.2KDKoJeGpiKs_7lZwxW8TAcldvzM3WhimJfQYxyZ_c0";
-const HD = { apikey: KEY, Authorization: `Bearer ${KEY}`, "Content-Type": "application/json", Prefer: "return=representation" };
-async function api(p, o = {}) { const r = await fetch(`${SB}/rest/v1/${p}`, { headers: HD, ...o }); const t = await r.text(); if (!r.ok) throw new Error(t); return t ? JSON.parse(t) : []; }
+// Supabase connection — configurable via env (point at a local copy for
+// testing); the anon key is public by design, real protection is the per-user
+// login + Row-Level Security.
+const SB = import.meta.env.VITE_SUPABASE_URL || "https://lvhqfslhcpiwshgvrnlp.supabase.co";
+const ANON = import.meta.env.VITE_SUPABASE_ANON_KEY || "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imx2aHFmc2xoY3Bpd3NoZ3ZybmxwIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzU3NjU5MTMsImV4cCI6MjA5MTM0MTkxM30.2KDKoJeGpiKs_7lZwxW8TAcldvzM3WhimJfQYxyZ_c0";
+
+const SESSION_KEY = "yard_session";
+let _session = (() => { try { return JSON.parse(localStorage.getItem(SESSION_KEY) || "null"); } catch { return null; } })();
+function setSession(s) { _session = s; try { s ? localStorage.setItem(SESSION_KEY, JSON.stringify(s)) : localStorage.removeItem(SESSION_KEY); } catch {} }
+function getSession() { return _session; }
+
+async function refreshSession() {
+  if (!_session?.refresh_token) return false;
+  try {
+    const r = await fetch(`${SB}/auth/v1/token?grant_type=refresh_token`, { method: "POST", headers: { apikey: ANON, "Content-Type": "application/json" }, body: JSON.stringify({ refresh_token: _session.refresh_token }) });
+    if (!r.ok) { setSession(null); return false; }
+    const d = await r.json(); setSession({ access_token: d.access_token, refresh_token: d.refresh_token }); return true;
+  } catch { return false; }
+}
+
+async function api(p, o = {}, _retry = true) {
+  const token = _session?.access_token || ANON;
+  const r = await fetch(`${SB}/rest/v1/${p}`, { ...o, headers: { apikey: ANON, Authorization: `Bearer ${token}`, "Content-Type": "application/json", Prefer: "return=representation", ...(o.headers || {}) } });
+  if (r.status === 401 && _retry && _session?.refresh_token) { if (await refreshSession()) return api(p, o, false); }
+  const t = await r.text();
+  if (!r.ok) throw new Error(t);
+  return t ? JSON.parse(t) : [];
+}
+
+async function authPassword(email, password) {
+  const r = await fetch(`${SB}/auth/v1/token?grant_type=password`, { method: "POST", headers: { apikey: ANON, "Content-Type": "application/json" }, body: JSON.stringify({ email, password }) });
+  const d = await r.json().catch(() => ({}));
+  if (!r.ok) throw new Error(d.error_description || d.msg || d.message || "Invalid email or password.");
+  setSession({ access_token: d.access_token, refresh_token: d.refresh_token }); return d.user;
+}
+async function authSignUp(email, password, name) {
+  const r = await fetch(`${SB}/auth/v1/signup`, { method: "POST", headers: { apikey: ANON, "Content-Type": "application/json" }, body: JSON.stringify({ email, password, data: { name } }) });
+  const d = await r.json().catch(() => ({}));
+  if (!r.ok) throw new Error(d.error_description || d.msg || d.message || "Sign up failed.");
+  if (d.access_token) setSession({ access_token: d.access_token, refresh_token: d.refresh_token }); return d;
+}
+async function authGetUser() {
+  if (!_session?.access_token) return null;
+  try { const r = await fetch(`${SB}/auth/v1/user`, { headers: { apikey: ANON, Authorization: `Bearer ${_session.access_token}` } }); if (!r.ok) return null; return await r.json(); } catch { return null; }
+}
+async function authSignOut() {
+  try { if (_session?.access_token) await fetch(`${SB}/auth/v1/logout`, { method: "POST", headers: { apikey: ANON, Authorization: `Bearer ${_session.access_token}` } }); } catch {}
+  setSession(null);
+}
+async function authUpdatePassword(password) {
+  const r = await fetch(`${SB}/auth/v1/user`, { method: "PUT", headers: { apikey: ANON, Authorization: `Bearer ${_session?.access_token}`, "Content-Type": "application/json" }, body: JSON.stringify({ password }) });
+  const d = await r.json().catch(() => ({}));
+  if (!r.ok) throw new Error(d.error_description || d.msg || d.message || "Couldn't update password.");
+  return d;
+}
 async function searchHangers(q) { if (!q || q.length < 2) return []; const r = await api(`hanger_reference?or=(model.ilike.*${q}*,manufacturer.ilike.*${q}*)`); return r; }
 
 const RO = { super_admin: 4, senior_admin: 3, admin: 2, user: 1 };
@@ -62,7 +113,8 @@ function AddressInput({ value, onChange, placeholder }) {
 
 export default function App() {
   const [user, setUser] = useState(null); const [mode, setMode] = useState("login");
-  const [aName, setAN] = useState(""); const [aPin, setAP] = useState(""); const [aEmail, setAE] = useState(""); const [aErr, setAErr] = useState("");
+  const [aName, setAN] = useState(""); const [aPin, setAP] = useState(""); const [aEmail, setAE] = useState(""); const [aPass, setAPass] = useState(""); const [aErr, setAErr] = useState("");
+  const [pwMod, setPwMod] = useState(false); const [newPw, setNewPw] = useState(""); const [newPw2, setNewPw2] = useState(""); const [pwErr, setPwErr] = useState(""); const [pwSaving, setPwSaving] = useState(false);
   const [mats, setMats] = useState([]); const [projs, setProjs] = useState([]); const [txns, setTxns] = useState([]); const [tools, setTools] = useState([]); const [cos, setCos] = useState([]); const [cats, setCats] = useState([]); const [users, setUsers] = useState([]);
   const [tab, setTab] = useState("yard"); const [search, setSrch] = useState(""); const [fCat, setFC] = useState("All");
   const [toast, setToast] = useState({ m: "", s: false }); const [loaded, setLoaded] = useState(false);
@@ -87,6 +139,9 @@ export default function App() {
   const show = useCallback(m => { setToast({ m, s: true }); setTimeout(() => setToast(t => ({ ...t, s: false })), 2800); }, []);
   const isA = user && RO[user.role] >= 2;
   const isS = user && RO[user.role] >= 3;
+  // Admin area is already role-gated + authenticated; auto-unlock it (the old
+  // secondary PIN re-check is obsolete now that login is real).
+  useEffect(() => { if (tab === "admin" && isA) setAdAuth(true); }, [tab, isA]);
 
   useEffect(() => {
     if (window.google && window.google.maps) { setMapsLoaded(true); return; }
@@ -106,11 +161,13 @@ export default function App() {
   }, []);
   useEffect(() => { if (user) load(); }, [user, load]);
   useEffect(() => { if (!user) return; const i = setInterval(load, 15000); return () => clearInterval(i); }, [user, load]);
+  useEffect(() => { (async () => { if (!getSession()?.access_token) return; const au = await authGetUser(); if (!au) { setSession(null); return; } try { const prof = await api(`yard_users?id=eq.${au.id}&limit=1`); if (prof?.[0] && prof[0].active !== false) setUser(prof[0]); else setSession(null); } catch { setSession(null); } })(); }, []);
 
   useEffect(() => { if (users.length) { const sa = users.find(u => u.role === "super_admin"); if (sa) setAdminEmail(sa.email); } }, [users]);
 
-  const login = async () => { setAErr(""); if (!aName.trim() || aPin.length !== 4) { setAErr("Enter name and 4-digit PIN."); return; } try { const all = await api("yard_users?active=eq.true"); const f = all.find(u => u.name.toLowerCase() === aName.trim().toLowerCase() && u.pin === aPin); if (!f) { setAErr("Name or PIN not found."); return; } setUser(f); show(`Welcome, ${f.name}!`); } catch (e) { setAErr("Connection error."); } };
-  const signup = async () => { setAErr(""); if (!aName.trim() || !aEmail.trim() || aPin.length !== 4) { setAErr("Fill all fields."); return; } try { const ex = await api(`yard_users?email=eq.${encodeURIComponent(aEmail.toLowerCase().trim())}`); if (ex?.length) { setAErr("Email registered."); return; } const r = await api("yard_users", { method: "POST", body: JSON.stringify({ email: aEmail.toLowerCase().trim(), name: aName.trim(), pin: aPin, role: "user" }) }); if (r?.[0]) { setUser(r[0]); show(`Welcome!`); } } catch (e) { setAErr("Failed."); } };
+  const login = async () => { setAErr(""); if (!aEmail.trim() || !aPass) { setAErr("Enter your email and password."); return; } try { const au = await authPassword(aEmail.trim().toLowerCase(), aPass); const prof = await api(`yard_users?id=eq.${au.id}&limit=1`); if (!prof?.[0]) { await authSignOut(); setAErr("No profile found for this account."); return; } if (prof[0].active === false) { await authSignOut(); setAErr("This account is deactivated."); return; } setUser(prof[0]); setAPass(""); show(`Welcome, ${prof[0].name}!`); } catch (e) { setAErr(e.message || "Login failed."); } };
+  const signup = async () => { setAErr(""); if (!aName.trim() || !aEmail.trim() || aPass.length < 8) { setAErr("Fill all fields. Password must be at least 8 characters."); return; } try { const d = await authSignUp(aEmail.trim().toLowerCase(), aPass, aName.trim()); if (!getSession()?.access_token) { setAErr("Account created. Check your email to confirm, then log in."); setMode("login"); return; } const au = d.user || (await authGetUser()); const prof = au ? await api(`yard_users?id=eq.${au.id}&limit=1`) : []; if (prof?.[0]) { setUser(prof[0]); setAPass(""); show(`Welcome, ${prof[0].name}!`); } else { setAErr("Account created — please log in."); setMode("login"); } } catch (e) { setAErr(e.message || "Sign up failed."); } };
+  const changePassword = async () => { setPwErr(""); if (newPw.length < 8) { setPwErr("Password must be at least 8 characters."); return; } if (newPw !== newPw2) { setPwErr("Passwords don't match."); return; } setPwSaving(true); try { await authUpdatePassword(newPw); setPwMod(false); setNewPw(""); setNewPw2(""); show("Password updated"); } catch (e) { setPwErr(e.message || "Couldn't update password."); } setPwSaving(false); };
 
   const saveMat = async (mat, reason) => {
     try {
@@ -220,8 +277,8 @@ export default function App() {
       <div style={{ display: "flex", background: P.bdL, borderRadius: 10, padding: 3, marginBottom: 24 }}>
         {["login", "signup"].map(m => <button key={m} onClick={() => { setMode(m); setAErr(""); }} style={{ flex: 1, padding: 10, borderRadius: 8, border: "none", background: mode === m ? "#fff" : "transparent", color: mode === m ? P.tx : P.l, fontSize: 14, fontWeight: 600, cursor: "pointer", fontFamily: F.b }}>{m === "login" ? "Log In" : "Sign Up"}</button>)}
       </div>
-      {mode === "signup" && <><Fl l="Name"><input style={iS} value={aName} onChange={e => setAN(e.target.value)} placeholder="e.g. Stephen" /></Fl><Fl l="Email"><input style={iS} type="email" value={aEmail} onChange={e => setAE(e.target.value)} placeholder="you@email.com" /></Fl><Fl l="Create 4-digit PIN"><input style={{ ...iS, textAlign: "center", fontSize: 24, letterSpacing: 12, fontFamily: F.m }} maxLength={4} value={aPin} onChange={e => setAP(e.target.value.replace(/\D/g, "").slice(0, 4))} placeholder="----" /></Fl>{aErr && <div style={{ color: P.r, fontSize: 13, marginBottom: 12, fontFamily: F.m }}>{aErr}</div>}<Btn full onClick={signup}>Create Account</Btn></>}
-      {mode === "login" && <><Fl l="Name"><input style={iS} value={aName} onChange={e => setAN(e.target.value)} placeholder="e.g. Stephen" onKeyDown={e => { if (e.key === "Enter") document.getElementById("pin")?.focus(); }} /></Fl><Fl l="PIN"><input id="pin" style={{ ...iS, textAlign: "center", fontSize: 24, letterSpacing: 12, fontFamily: F.m }} maxLength={4} value={aPin} onChange={e => setAP(e.target.value.replace(/\D/g, "").slice(0, 4))} placeholder="----" onKeyDown={e => { if (e.key === "Enter" && aPin.length === 4) login(); }} /></Fl>{aErr && <div style={{ color: P.r, fontSize: 13, marginBottom: 12, fontFamily: F.m }}>{aErr}</div>}<Btn full onClick={login}>Enter the Yard</Btn></>}
+      {mode === "signup" && <><Fl l="Name"><input style={iS} value={aName} onChange={e => setAN(e.target.value)} placeholder="e.g. Stephen" /></Fl><Fl l="Email"><input style={iS} type="email" value={aEmail} onChange={e => setAE(e.target.value)} placeholder="you@email.com" /></Fl><Fl l="Create Password"><input style={iS} type="password" value={aPass} onChange={e => setAPass(e.target.value)} placeholder="At least 8 characters" onKeyDown={e => { if (e.key === "Enter") signup(); }} /></Fl>{aErr && <div style={{ color: P.r, fontSize: 13, marginBottom: 12, fontFamily: F.m }}>{aErr}</div>}<Btn full onClick={signup}>Create Account</Btn></>}
+      {mode === "login" && <><Fl l="Email"><input style={iS} type="email" value={aEmail} onChange={e => setAE(e.target.value)} placeholder="you@email.com" onKeyDown={e => { if (e.key === "Enter") document.getElementById("pw")?.focus(); }} /></Fl><Fl l="Password"><input id="pw" style={iS} type="password" value={aPass} onChange={e => setAPass(e.target.value)} placeholder="Your password" onKeyDown={e => { if (e.key === "Enter") login(); }} /></Fl>{aErr && <div style={{ color: P.r, fontSize: 13, marginBottom: 12, fontFamily: F.m }}>{aErr}</div>}<Btn full onClick={login}>Enter the Yard</Btn></>}
     </div>
   </div>;
 
@@ -263,7 +320,8 @@ export default function App() {
       <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
         <span style={{ fontSize: 12, color: P.l, fontFamily: F.m }}>{user.name}</span>
         {isA && <span style={{ background: P.rB, color: P.r, fontSize: 9, fontWeight: 700, padding: "2px 6px", borderRadius: 4, fontFamily: F.m }}>{RL[user.role]}</span>}
-        <button onClick={() => { setUser(null); setAN(""); setAP(""); setAdAuth(false); setAdPg("hub"); }} style={{ background: P.tB, border: "none", cursor: "pointer", color: P.m, padding: "6px 10px", borderRadius: 8, fontSize: 11, fontFamily: F.m, fontWeight: 600 }}>Log Out</button>
+        <button onClick={() => setPwMod(true)} title="Change password" style={{ background: P.tB, border: "none", cursor: "pointer", color: P.m, padding: "6px 9px", borderRadius: 8, fontSize: 12, fontFamily: F.m, fontWeight: 600 }}>🔑</button>
+        <button onClick={() => { authSignOut(); setUser(null); setAN(""); setAP(""); setAPass(""); setAdAuth(false); setAdPg("hub"); }} style={{ background: P.tB, border: "none", cursor: "pointer", color: P.m, padding: "6px 10px", borderRadius: 8, fontSize: 11, fontFamily: F.m, fontWeight: 600 }}>Log Out</button>
       </div>
     </div>
     <div style={{ padding: "16px 16px 0" }}>
@@ -475,6 +533,12 @@ export default function App() {
       <div style={{ display: "flex", gap: 10 }}><button onClick={() => setDUM(null)} style={{ flex: 1, padding: 12, borderRadius: 10, border: `1.5px solid ${P.bd}`, background: "#fff", color: P.m, fontWeight: 600, cursor: "pointer" }}>Cancel</button><Btn full color={P.r} onClick={() => delUser(delUserMod)} sx={{ flex: 1 }}>Delete</Btn></div>
     </Modal>
 
+    <Modal open={pwMod} onClose={() => { setPwMod(false); setNewPw(""); setNewPw2(""); setPwErr(""); }} title="Change Password">
+      <Fl l="New Password"><input style={iS} type="password" value={newPw} onChange={e => setNewPw(e.target.value)} placeholder="At least 8 characters" /></Fl>
+      <Fl l="Confirm New Password"><input style={iS} type="password" value={newPw2} onChange={e => setNewPw2(e.target.value)} placeholder="Re-enter new password" onKeyDown={e => { if (e.key === "Enter") changePassword(); }} /></Fl>
+      {pwErr && <div style={{ color: P.r, fontSize: 13, marginBottom: 12, fontFamily: F.m }}>{pwErr}</div>}
+      <Btn full disabled={pwSaving} onClick={changePassword}>{pwSaving ? "Saving..." : "Update Password"}</Btn>
+    </Modal>
     <Nav tab={tab} set={t => { setTab(t); if (t !== "admin") { setAdPg("hub"); setAdAuth(false); setAAN(""); setAAP(""); } }} isAdmin={isA} />
     <Toast msg={toast.m} show={toast.s} />
   </div>;
