@@ -127,8 +127,7 @@ export default function App() {
   const [detail, setDetail] = useState(null); const [dProj, setDProj] = useState(null); const [pFilter, setPF] = useState("active");
   const [hwSearch, setHwSearch] = useState(""); const [hwResults, setHwResults] = useState([]); const [hwSelected, setHwSelected] = useState(null);
   const [adPg, setAdPg] = useState("hub"); const [adAuth, setAdAuth] = useState(false);
-  const [aaName, setAAN] = useState(""); const [aaPin, setAAP] = useState(""); const [aaErr, setAAE] = useState("");
-  const [editUser, setEU] = useState(null); const [euN, setEUN] = useState(""); const [euE, setEUE] = useState(""); const [euP, setEUP] = useState("");
+  const [editUser, setEU] = useState(null); const [euN, setEUN] = useState(""); const [euE, setEUE] = useState("");
   const [delUserMod, setDUM] = useState(null);
   const [nCat, setNC] = useState(""); const [adminEmail, setAdminEmail] = useState("");
   const [rptCat, setRptCat] = useState("All"); const [rptCond, setRptCond] = useState("All"); const [rptStock, setRptStock] = useState("All");
@@ -254,7 +253,7 @@ export default function App() {
   const delCat = async (id, n) => { try { await api(`categories?id=eq.${id}`, { method: "DELETE" }); await load(); show(`"${n}" removed`); } catch (e) { show("Error"); } };
   const togUser = async (id, a) => { try { await api(`yard_users?id=eq.${id}`, { method: "PATCH", body: JSON.stringify({ active: !a }) }); await load(); show(a ? "Deactivated" : "Activated"); } catch (e) { show("Error"); } };
   const chRole = async (id, r) => { try { await api(`yard_users?id=eq.${id}`, { method: "PATCH", body: JSON.stringify({ role: r }) }); await load(); show("Updated"); } catch (e) { show("Error"); } };
-  const saveEU = async () => { if (!euN.trim() || !euE.trim() || euP.length !== 4) { show("Fill all fields"); return; } try { await api(`yard_users?id=eq.${editUser}`, { method: "PATCH", body: JSON.stringify({ name: euN.trim(), email: euE.toLowerCase().trim(), pin: euP }) }); await load(); setEU(null); show("Updated"); } catch (e) { show("Error"); } };
+  const saveEU = async () => { if (!euN.trim()) { show("Name is required"); return; } try { await api(`yard_users?id=eq.${editUser}`, { method: "PATCH", body: JSON.stringify({ name: euN.trim() }) }); await load(); setEU(null); show("Updated"); } catch (e) { show("Error"); } };
   const delUser = async (id) => { try { await api(`yard_users?id=eq.${id}`, { method: "DELETE" }); await load(); setDUM(null); show("Employee deleted"); } catch (e) { show("Error"); } };
 
   const lowS = mats.filter(m => !m.deleted && gSt(m.qty, m.low_threshold) !== "good");
@@ -403,14 +402,8 @@ export default function App() {
       </div>}
 
       {tab === "admin" && isA && <div style={{ animation: "fadeIn .3s" }}>
-        {!adAuth && <div style={{ maxWidth: 340, margin: "40px auto", textAlign: "center" }}>
-          <h2 style={{ fontFamily: F.h, fontSize: 20, fontWeight: 700, marginBottom: 20 }}>Admin Access</h2>
-          <Fl l="Name"><input style={iS} value={aaName} onChange={e => setAAN(e.target.value)} /></Fl>
-          <Fl l="PIN"><input style={{ ...iS, textAlign: "center", fontSize: 24, letterSpacing: 12, fontFamily: F.m }} maxLength={4} value={aaPin} onChange={e => setAAP(e.target.value.replace(/\D/g, "").slice(0, 4))} placeholder="----" onKeyDown={e => { if (e.key === "Enter") { if (aaName.toLowerCase() === user.name.toLowerCase() && aaPin === user.pin) setAdAuth(true); else setAAE("Invalid."); } }} /></Fl>
-          {aaErr && <div style={{ color: P.r, fontSize: 13, marginBottom: 12, fontFamily: F.m }}>{aaErr}</div>}
-          <Btn full onClick={() => { if (aaName.toLowerCase() === user.name.toLowerCase() && aaPin === user.pin) setAdAuth(true); else setAAE("Invalid."); }}>Unlock</Btn>
-        </div>}
-
+        {/* Admin access is granted by role (see the auto-unlock effect) — no
+            secondary PIN. The old PIN gate was retired with the PIN system. */}
         {adAuth && adPg === "hub" && <div>
           <h2 style={{ fontFamily: F.h, fontSize: 20, fontWeight: 700, margin: "0 0 20px" }}>Admin</h2>
           {[{ k: "reports", l: "Inventory Report", d: "View & export inventory", c: P.r }, { k: "employees", l: "Employees", d: "Manage team", c: P.bk }, { k: "categories", l: "Categories", d: "Add & remove categories", c: P.tn }, { k: "deleted", l: "Deleted Items", d: "Restore deleted materials", c: P.l }, { k: "settings", l: "Settings", d: "Notification email", c: P.am }].map(p =>
@@ -444,7 +437,7 @@ export default function App() {
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
                 <div><div style={{ fontWeight: 600, fontSize: 15, color: u.active ? P.tx : P.l }}>{u.name} {self && <span style={{ fontSize: 11, color: P.l }}>(you)</span>}</div><div style={{ fontSize: 11, fontFamily: F.m, color: P.l }}>{u.email} · <span style={{ color: P.r }}>{RL[u.role]}</span></div></div>
                 {canE && !self && <div style={{ display: "flex", flexDirection: "column", gap: 4, alignItems: "flex-end" }}>
-                  <button onClick={() => { setEU(u.id); setEUN(u.name); setEUE(u.email); setEUP(u.pin); }} style={{ fontSize: 11, padding: "4px 10px", borderRadius: 6, border: `1px solid ${P.bd}`, background: "#fff", color: P.m, cursor: "pointer", fontFamily: F.m }}>Edit</button>
+                  <button onClick={() => { setEU(u.id); setEUN(u.name); setEUE(u.email); }} style={{ fontSize: 11, padding: "4px 10px", borderRadius: 6, border: `1px solid ${P.bd}`, background: "#fff", color: P.m, cursor: "pointer", fontFamily: F.m }}>Edit</button>
                   <select value={u.role} onChange={e => chRole(u.id, e.target.value)} style={{ fontSize: 11, padding: "4px 8px", borderRadius: 6, border: `1px solid ${P.bd}`, fontFamily: F.m }}><option value="user">Employee</option><option value="admin">Admin</option>{isS && <option value="senior_admin">Sr Admin</option>}</select>
                   <button onClick={() => togUser(u.id, u.active)} style={{ fontSize: 11, padding: "4px 10px", borderRadius: 6, border: "none", background: u.active ? P.rB : P.gB, color: u.active ? P.r : P.g, fontWeight: 600, cursor: "pointer", fontFamily: F.m }}>{u.active ? "Deactivate" : "Activate"}</button>
                   <button onClick={() => setDUM(u.id)} style={{ fontSize: 11, padding: "4px 10px", borderRadius: 6, border: "none", background: P.r, color: "#fff", fontWeight: 600, cursor: "pointer", fontFamily: F.m }}>Delete</button>
@@ -518,9 +511,9 @@ export default function App() {
 
     <Modal open={!!editUser} onClose={() => setEU(null)} title="Edit Employee">
       <Fl l="Name"><input style={iS} value={euN} onChange={e => setEUN(e.target.value)} /></Fl>
-      <Fl l="Email"><input style={iS} type="email" value={euE} onChange={e => setEUE(e.target.value)} /></Fl>
-      <Fl l="PIN"><input style={{ ...iS, textAlign: "center", fontSize: 20, letterSpacing: 10, fontFamily: F.m }} maxLength={4} value={euP} onChange={e => setEUP(e.target.value.replace(/\D/g, "").slice(0, 4))} /></Fl>
-      <Btn full disabled={!euN.trim() || !euE.trim() || euP.length !== 4} onClick={saveEU}>Save</Btn>
+      <Fl l="Email (login)"><input style={{ ...iS, background: P.bg, color: P.l, cursor: "not-allowed" }} type="email" value={euE} readOnly /></Fl>
+      <p style={{ fontSize: 11, color: P.l, margin: "-6px 0 16px", fontFamily: F.m }}>Login email &amp; password are managed by the employee from their own account (🔑 Change Password). Set role &amp; active status from the employee list.</p>
+      <Btn full disabled={!euN.trim()} onClick={saveEU}>Save</Btn>
     </Modal>
 
     <Modal open={emailMod} onClose={() => setEM(false)} title="Email Report">
@@ -539,7 +532,7 @@ export default function App() {
       {pwErr && <div style={{ color: P.r, fontSize: 13, marginBottom: 12, fontFamily: F.m }}>{pwErr}</div>}
       <Btn full disabled={pwSaving} onClick={changePassword}>{pwSaving ? "Saving..." : "Update Password"}</Btn>
     </Modal>
-    <Nav tab={tab} set={t => { setTab(t); if (t !== "admin") { setAdPg("hub"); setAdAuth(false); setAAN(""); setAAP(""); } }} isAdmin={isA} />
+    <Nav tab={tab} set={t => { setTab(t); if (t !== "admin") { setAdPg("hub"); setAdAuth(false); } }} isAdmin={isA} />
     <Toast msg={toast.m} show={toast.s} />
   </div>;
 }
