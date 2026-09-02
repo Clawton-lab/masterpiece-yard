@@ -59,6 +59,15 @@ async function searchHangers(q) { if (!q || q.length < 2) return []; const r = a
 
 const RO = { super_admin: 4, senior_admin: 3, admin: 2, user: 1 };
 const RL = { super_admin: "Owner", senior_admin: "Sr Admin", admin: "Admin", user: "Employee" };
+const PASSWORD_SPECIALS = "!@#$%^&*()_+-=[]{};'\\:\"|<>?,./`~";
+const PASSWORD_HELP = "Use 8–16 characters with an uppercase letter, a number, and a special character.";
+function passwordError(password) {
+  if (password.length < 8 || password.length > 16) return "Password must be 8–16 characters.";
+  if (!/[A-Z]/.test(password)) return "Add at least one uppercase letter.";
+  if (!/[0-9]/.test(password)) return "Add at least one number.";
+  if (![...password].some(ch => PASSWORD_SPECIALS.includes(ch))) return "Add at least one special character.";
+  return "";
+}
 const UNITS = ["bags", "boxes", "each", "LF", "pallets", "pcs", "qty", "rolls", "SF"];
 const CONDS = ["Good", "Fair", "Poor"];
 const P = { bg: "#faf8f5", c: "#fff", bd: "#e5e0d8", bdL: "#f0ece6", tx: "#1a1a1a", m: "#6b6560", l: "#9c9590", r: "#c41e2a", rB: "rgba(196,30,42,0.06)", tn: "#c4b59a", tB: "rgba(196,181,154,0.12)", bk: "#1a1a1a", g: "#16a34a", gB: "rgba(22,163,74,0.08)", am: "#d97706", aB: "rgba(217,119,6,0.08)" };
@@ -165,8 +174,30 @@ export default function App() {
   useEffect(() => { if (users.length) { const sa = users.find(u => u.role === "super_admin"); if (sa) setAdminEmail(sa.email); } }, [users]);
 
   const login = async () => { setAErr(""); if (!aEmail.trim() || !aPass) { setAErr("Enter your email and password."); return; } try { const au = await authPassword(aEmail.trim().toLowerCase(), aPass); const prof = await api(`yard_users?id=eq.${au.id}&limit=1`); if (!prof?.[0]) { await authSignOut(); setAErr("No profile found for this account."); return; } if (prof[0].active === false) { await authSignOut(); setAErr("This account is deactivated."); return; } setUser(prof[0]); setAPass(""); show(`Welcome, ${prof[0].name}!`); } catch (e) { setAErr(e.message || "Login failed."); } };
-  const signup = async () => { setAErr(""); if (!aName.trim() || !aEmail.trim() || aPass.length < 8) { setAErr("Fill all fields. Password must be at least 8 characters."); return; } try { const d = await authSignUp(aEmail.trim().toLowerCase(), aPass, aName.trim()); if (!getSession()?.access_token) { setAErr("Account created. Check your email to confirm, then log in."); setMode("login"); return; } const au = d.user || (await authGetUser()); const prof = au ? await api(`yard_users?id=eq.${au.id}&limit=1`) : []; if (prof?.[0]) { setUser(prof[0]); setAPass(""); show(`Welcome, ${prof[0].name}!`); } else { setAErr("Account created — please log in."); setMode("login"); } } catch (e) { setAErr(e.message || "Sign up failed."); } };
-  const changePassword = async () => { setPwErr(""); if (newPw.length < 8) { setPwErr("Password must be at least 8 characters."); return; } if (newPw !== newPw2) { setPwErr("Passwords don't match."); return; } setPwSaving(true); try { await authUpdatePassword(newPw); setPwMod(false); setNewPw(""); setNewPw2(""); show("Password updated"); } catch (e) { setPwErr(e.message || "Couldn't update password."); } setPwSaving(false); };
+  const signup = async () => {
+    setAErr("");
+    if (!aName.trim() || !aEmail.trim()) { setAErr("Fill all fields."); return; }
+    const validationError = passwordError(aPass);
+    if (validationError) { setAErr(validationError); return; }
+    try {
+      const d = await authSignUp(aEmail.trim().toLowerCase(), aPass, aName.trim());
+      if (!getSession()?.access_token) { setAErr("Account created. Check your email to confirm, then log in."); setMode("login"); return; }
+      const au = d.user || (await authGetUser());
+      const prof = au ? await api(`yard_users?id=eq.${au.id}&limit=1`) : [];
+      if (prof?.[0]) { setUser(prof[0]); setAPass(""); show(`Welcome, ${prof[0].name}!`); }
+      else { setAErr("Account created — please log in."); setMode("login"); }
+    } catch (e) { setAErr(e.message || "Sign up failed."); }
+  };
+  const changePassword = async () => {
+    setPwErr("");
+    const validationError = passwordError(newPw);
+    if (validationError) { setPwErr(validationError); return; }
+    if (newPw !== newPw2) { setPwErr("Passwords don't match."); return; }
+    setPwSaving(true);
+    try { await authUpdatePassword(newPw); setPwMod(false); setNewPw(""); setNewPw2(""); show("Password updated"); }
+    catch (e) { setPwErr(e.message || "Couldn't update password."); }
+    setPwSaving(false);
+  };
 
   const saveMat = async (mat, reason) => {
     try {
@@ -276,7 +307,7 @@ export default function App() {
       <div style={{ display: "flex", background: P.bdL, borderRadius: 10, padding: 3, marginBottom: 24 }}>
         {["login", "signup"].map(m => <button key={m} onClick={() => { setMode(m); setAErr(""); }} style={{ flex: 1, padding: 10, borderRadius: 8, border: "none", background: mode === m ? "#fff" : "transparent", color: mode === m ? P.tx : P.l, fontSize: 14, fontWeight: 600, cursor: "pointer", fontFamily: F.b }}>{m === "login" ? "Log In" : "Sign Up"}</button>)}
       </div>
-      {mode === "signup" && <><Fl l="Name"><input style={iS} value={aName} onChange={e => setAN(e.target.value)} placeholder="e.g. Stephen" /></Fl><Fl l="Email"><input style={iS} type="email" value={aEmail} onChange={e => setAE(e.target.value)} placeholder="you@email.com" /></Fl><Fl l="Create Password"><input style={iS} type="password" value={aPass} onChange={e => setAPass(e.target.value)} placeholder="At least 8 characters" onKeyDown={e => { if (e.key === "Enter") signup(); }} /></Fl>{aErr && <div style={{ color: P.r, fontSize: 13, marginBottom: 12, fontFamily: F.m }}>{aErr}</div>}<Btn full onClick={signup}>Create Account</Btn></>}
+      {mode === "signup" && <><Fl l="Name"><input style={iS} value={aName} onChange={e => setAN(e.target.value)} placeholder="e.g. Stephen" /></Fl><Fl l="Email"><input style={iS} type="email" value={aEmail} onChange={e => setAE(e.target.value)} placeholder="you@email.com" /></Fl><Fl l="Create Password"><input style={iS} type="password" value={aPass} onChange={e => setAPass(e.target.value)} placeholder="8–16 characters" maxLength={16} onKeyDown={e => { if (e.key === "Enter") signup(); }} /></Fl><p style={{ fontSize: 11.5, color: P.l, margin: "-8px 0 14px", lineHeight: 1.45, fontFamily: F.m }}>{PASSWORD_HELP}</p>{aErr && <div style={{ color: P.r, fontSize: 13, marginBottom: 12, fontFamily: F.m }}>{aErr}</div>}<Btn full onClick={signup}>Create Account</Btn></>}
       {mode === "login" && <><Fl l="Email"><input style={iS} type="email" value={aEmail} onChange={e => setAE(e.target.value)} placeholder="you@email.com" onKeyDown={e => { if (e.key === "Enter") document.getElementById("pw")?.focus(); }} /></Fl><Fl l="Password"><input id="pw" style={iS} type="password" value={aPass} onChange={e => setAPass(e.target.value)} placeholder="Your password" onKeyDown={e => { if (e.key === "Enter") login(); }} /></Fl>{aErr && <div style={{ color: P.r, fontSize: 13, marginBottom: 12, fontFamily: F.m }}>{aErr}</div>}<Btn full onClick={login}>Enter the Yard</Btn></>}
     </div>
   </div>;
@@ -527,8 +558,9 @@ export default function App() {
     </Modal>
 
     <Modal open={pwMod} onClose={() => { setPwMod(false); setNewPw(""); setNewPw2(""); setPwErr(""); }} title="Change Password">
-      <Fl l="New Password"><input style={iS} type="password" value={newPw} onChange={e => setNewPw(e.target.value)} placeholder="At least 8 characters" /></Fl>
-      <Fl l="Confirm New Password"><input style={iS} type="password" value={newPw2} onChange={e => setNewPw2(e.target.value)} placeholder="Re-enter new password" onKeyDown={e => { if (e.key === "Enter") changePassword(); }} /></Fl>
+      <Fl l="New Password"><input style={iS} type="password" value={newPw} onChange={e => setNewPw(e.target.value)} placeholder="8–16 characters" maxLength={16} /></Fl>
+      <p style={{ fontSize: 11.5, color: P.l, margin: "-8px 0 14px", lineHeight: 1.45, fontFamily: F.m }}>{PASSWORD_HELP}</p>
+      <Fl l="Confirm New Password"><input style={iS} type="password" value={newPw2} onChange={e => setNewPw2(e.target.value)} placeholder="Re-enter new password" maxLength={16} onKeyDown={e => { if (e.key === "Enter") changePassword(); }} /></Fl>
       {pwErr && <div style={{ color: P.r, fontSize: 13, marginBottom: 12, fontFamily: F.m }}>{pwErr}</div>}
       <Btn full disabled={pwSaving} onClick={changePassword}>{pwSaving ? "Saving..." : "Update Password"}</Btn>
     </Modal>
